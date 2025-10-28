@@ -14,6 +14,7 @@ Schema generation powered by [schema](https://github.com/andrewgazelka/schema) -
 | **Bidirectional RPC** | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | **Streaming** | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | 🚧 |
 | **Call from web** | ❌ proxy | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| **Cross-language clients** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | 🚧 |
 | **Server-side composition** | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | 🚧 |
 | **Direct FFI bindings** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | 🚧 |
 
