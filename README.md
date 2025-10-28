@@ -6,17 +6,17 @@ Schema generation powered by [schema](https://github.com/andrewgazelka/schema) -
 
 ## Why?
 
-|  | gRPC | JSON-RPC | Cap'n Proto | Cap'n Web | tarpc | UniFFI | **This** |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Rust source of truth** | ❌ .proto | ✅ | ❌ .capnp | ❌ JS only | ✅ | ❌ .udl | ✅ |
-| **Swap transport** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Swap codec** | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ |
-| **Bidirectional RPC** | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **Streaming** | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | 🚧 |
-| **Call from web** | ❌ proxy | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ |
-| **Cross-language clients** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | 🚧 |
-| **Server-side composition** | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | 🚧 |
-| **Direct FFI bindings** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | 🚧 |
+|  | [gRPC](https://grpc.io) | [JSON-RPC](https://www.jsonrpc.org) | [Cap'n Proto](https://capnproto.org) | [Cap'n Web](https://capnproto.org/rpc.html) | [tarpc](https://github.com/google/tarpc) | [tRPC](https://trpc.io) | [UniFFI](https://mozilla.github.io/uniffi-rs/) | **This** |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Rust source of truth** | ❌ .proto | ✅ | ❌ .capnp | ❌ JS only | ✅ | ❌ TS only | ❌ .udl | ✅ |
+| **Swap transport** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Swap codec** | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| **Bidirectional RPC** | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Streaming** | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ | 🚧 |
+| **Call from web** | ❌ proxy | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ |
+| **Cross-language clients** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ TS only | ✅ | 🚧 |
+| **Server-side composition** | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | 🚧 |
+| **Direct FFI bindings** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | 🚧 |
 
 **No schemas. No boilerplate. No compromises.**
 
