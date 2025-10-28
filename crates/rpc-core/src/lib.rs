@@ -3,6 +3,7 @@
 //! This crate provides the fundamental abstractions needed for building
 //! transport-agnostic and codec-agnostic RPC systems.
 
+use schema::Schema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -56,14 +57,14 @@ pub trait Transport: Send {
 /// serialization format (JSON, MessagePack, Protobuf, etc.).
 pub trait Codec: Send + Sync {
     /// Encode a value to bytes
-    fn encode<T: Serialize>(&self, value: &T) -> Result<Vec<u8>>;
+    fn encode<T: Serialize + Schema>(&self, value: &T) -> Result<Vec<u8>>;
 
     /// Decode bytes to a value
-    fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T>;
+    fn decode<T: for<'de> Deserialize<'de> + Schema>(&self, bytes: &[u8]) -> Result<T>;
 }
 
 /// RPC request structure
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema, PartialEq, Eq)]
 pub struct RpcRequest {
     /// Request ID for matching responses
     pub id: u64,
@@ -74,7 +75,7 @@ pub struct RpcRequest {
 }
 
 /// RPC response structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub struct RpcResponse {
     /// Request ID this response corresponds to
     pub id: u64,
@@ -83,7 +84,7 @@ pub struct RpcResponse {
 }
 
 /// Result of an RPC call
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Schema)]
 pub enum ResponseResult {
     /// Successful result with data
     Ok(Vec<u8>),

@@ -30,9 +30,9 @@ Schema generation powered by [schema](https://github.com/andrewgazelka/schema) -
 | **Streaming** | 🚧 | Support streaming requests and responses |
 | **Any transport** | ✅ | WebSocket, HTTP, Stdio, in-process channels, custom transports |
 | **Decoupled evolution** | 🚧 | Server changes don't require client recompilation - client and server evolve independently |
-| **Schema generation** | 📋 | Generate schemas from RPC definitions for OpenAPI specs, MCP servers (requires `#[derive(Schema)]` crate) |
+| **Schema generation** | ✅ | Generate OpenAPI specs and TypeScript clients from RPC definitions via `schema` crate |
 | **Observability** | 📋 | LLM-first observability via RPC - query transaction history, inspect logs, view request/response pairs |
-| **Language agnostic** | 📋 | Work with any language, not just Rust - clients in Python, JavaScript, Go, etc. |
+| **Language agnostic** | 🚧 | TypeScript clients via codegen, Python/Go/etc. planned |
 
 ### Low Priority (Needs More Thought)
 
@@ -43,6 +43,8 @@ Schema generation powered by [schema](https://github.com/andrewgazelka/schema) -
 ## Usage
 
 ```rust
+use schema::Schema;
+
 // Define your API
 rpc! {
     extern "Rust" {
@@ -72,12 +74,40 @@ let client = client::Client::new(transport, MessagePackCodec);
 let result = client.add(2, 3).await?;  // => 5
 ```
 
+### Generate OpenAPI & TypeScript
+
+```rust
+// Get schema from RPC definition
+let schemas = client::Client::<AnyTransport, AnyCodec>::schema();
+
+// Generate OpenAPI 3.0 spec
+let openapi = generate_openapi_spec("My API", "1.0.0", schemas);
+
+// Generate TypeScript client
+let ts_client = generate_typescript_client("MyApiClient", "http://localhost:8080", schemas);
+```
+
+Output TypeScript:
+
+```typescript
+export class MyApiClient {
+  async add(arg0: number, arg1: number): Promise<number> {
+    return this.request<number>('add', [arg0, arg1]);
+  }
+
+  async greet(arg0: string): Promise<string> {
+    return this.request<string>('greet', [arg0]);
+  }
+}
+```
+
 ## Features
 
 - **Modular**: Separate crates for transport, codec, core
 - **Pluggable**: Mix & match any transport with any codec
 - **Type-safe**: Macro generates fully-typed client/server
 - **Modern**: Native async traits (Rust 1.75+)
+- **Schema-aware**: Automatic OpenAPI & TypeScript generation
 - **Flexible transports**: WebSocket, Stdio, in-process, HTTP (planned)
 
 ## Packages
@@ -91,9 +121,10 @@ let result = client.add(2, 3).await?;  // => 5
 | `rpc-transport-ws` | WebSocket transport | ~100 LOC |
 | `rpc-transport-stdio` | Stdio transport | ~80 LOC |
 | `rpc-transport-inprocess` | In-process channels | ~60 LOC |
+| `rpc-openapi` | OpenAPI & TS generation | ~400 LOC |
 | `rpc-server` | Runtime glue | ~10 LOC |
 
-Total: **~650 LOC**
+Total: **~1,050 LOC**
 
 ## Examples
 

@@ -99,7 +99,9 @@ async fn run_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("  As server: cargo run --example stdio_embedded -- server");
     println!("  As client: cargo run --example stdio_embedded -- client\n");
     println!("For piped communication:");
-    println!("  cargo run --example stdio_embedded -- client | cargo run --example stdio_embedded -- server\n");
+    println!(
+        "  cargo run --example stdio_embedded -- client | cargo run --example stdio_embedded -- server\n"
+    );
     println!("Demo mode: simulating in-process communication...\n");
 
     // For demo, we'll use in-process channels to simulate

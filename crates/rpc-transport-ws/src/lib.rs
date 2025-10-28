@@ -6,8 +6,8 @@ use futures::{SinkExt, StreamExt};
 use rpc_core::{Error, Message, Result, Transport};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::{
-    accept_async, connect_async, tungstenite::protocol::Message as WsMessage, MaybeTlsStream,
-    WebSocketStream,
+    MaybeTlsStream, WebSocketStream, accept_async, connect_async,
+    tungstenite::protocol::Message as WsMessage,
 };
 
 /// WebSocket transport implementation.

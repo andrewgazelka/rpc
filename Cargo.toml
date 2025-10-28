@@ -9,12 +9,13 @@ members = [
     "crates/rpc-transport-stdio",
     "crates/rpc-transport-inprocess",
     "crates/rpc-server",
+    "crates/rpc-openapi",
     "examples-crate",
 ]
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 rust-version = "1.75"
 license = "MIT"
 authors = ["Andrew Gazelka"]
@@ -29,6 +30,10 @@ futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rmp-serde = "1.3"
+
+# Schema
+schema = { path = "/Users/andrewgazelka/Projects/superglide/schema/schema" }
+schema-openapi = { path = "/Users/andrewgazelka/Projects/superglide/schema/schema-openapi" }
 
 # WebSocket
 tokio = { version = "1.42", features = ["full"] }
@@ -48,6 +53,7 @@ rpc-transport-ws = { path = "crates/rpc-transport-ws" }
 rpc-transport-stdio = { path = "crates/rpc-transport-stdio" }
 rpc-transport-inprocess = { path = "crates/rpc-transport-inprocess" }
 rpc-server = { path = "crates/rpc-server" }
+rpc-openapi = { path = "crates/rpc-openapi" }
 
 [profile.dev]
 opt-level = 0

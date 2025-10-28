@@ -4,6 +4,7 @@
 //! Best for high-throughput applications and bandwidth-constrained scenarios.
 
 use rpc_core::{Codec, Error, Result};
+use schema::Schema;
 use serde::{Deserialize, Serialize};
 
 /// MessagePack codec using rmp-serde.
@@ -29,12 +30,12 @@ use serde::{Deserialize, Serialize};
 pub struct MessagePackCodec;
 
 impl Codec for MessagePackCodec {
-    fn encode<T: Serialize>(&self, value: &T) -> Result<Vec<u8>> {
+    fn encode<T: Serialize + Schema>(&self, value: &T) -> Result<Vec<u8>> {
         rmp_serde::to_vec(value)
             .map_err(|e| Error::codec(format!("MessagePack encode error: {}", e)))
     }
 
-    fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T> {
+    fn decode<T: for<'de> Deserialize<'de> + Schema>(&self, bytes: &[u8]) -> Result<T> {
         rmp_serde::from_slice(bytes)
             .map_err(|e| Error::codec(format!("MessagePack decode error: {}", e)))
     }
@@ -69,17 +70,13 @@ mod tests {
 
     #[test]
     fn test_msgpack_complex_types() {
-        use std::collections::HashMap;
-
         let codec = MessagePackCodec;
-        let mut map = HashMap::new();
-        map.insert("key1".to_string(), 42);
-        map.insert("key2".to_string(), 100);
+        let value = (42, "test".to_string(), true);
 
-        let encoded = codec.encode(&map).unwrap();
-        let decoded: HashMap<String, i32> = codec.decode(&encoded).unwrap();
+        let encoded = codec.encode(&value).unwrap();
+        let decoded: (i32, String, bool) = codec.decode(&encoded).unwrap();
 
-        assert_eq!(map, decoded);
+        assert_eq!(value, decoded);
     }
 
     #[test]
@@ -94,12 +91,14 @@ mod tests {
 
     #[test]
     fn test_msgpack_nested_structures() {
-        #[derive(Debug, Serialize, Deserialize, PartialEq)]
+        use schema::Schema;
+
+        #[derive(Debug, Serialize, Deserialize, Schema, PartialEq)]
         struct Inner {
             value: i32,
         }
 
-        #[derive(Debug, Serialize, Deserialize, PartialEq)]
+        #[derive(Debug, Serialize, Deserialize, Schema, PartialEq)]
         struct Outer {
             name: String,
             inner: Inner,

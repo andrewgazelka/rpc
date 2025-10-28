@@ -4,6 +4,7 @@
 //! Best for web APIs, debugging, and when message inspection is important.
 
 use rpc_core::{Codec, Error, Result};
+use schema::Schema;
 use serde::{Deserialize, Serialize};
 
 /// JSON codec using serde_json.
@@ -26,11 +27,11 @@ use serde::{Deserialize, Serialize};
 pub struct JsonCodec;
 
 impl Codec for JsonCodec {
-    fn encode<T: Serialize>(&self, value: &T) -> Result<Vec<u8>> {
+    fn encode<T: Serialize + Schema>(&self, value: &T) -> Result<Vec<u8>> {
         serde_json::to_vec(value).map_err(|e| Error::codec(format!("JSON encode error: {}", e)))
     }
 
-    fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T> {
+    fn decode<T: for<'de> Deserialize<'de> + Schema>(&self, bytes: &[u8]) -> Result<T> {
         serde_json::from_slice(bytes).map_err(|e| Error::codec(format!("JSON decode error: {}", e)))
     }
 }
@@ -53,7 +54,7 @@ mod tests {
     #[test]
     fn test_json_human_readable() {
         let codec = JsonCodec;
-        let value = ("hello", 42);
+        let value = ("hello".to_string(), 42);
 
         let encoded = codec.encode(&value).unwrap();
         let json_str = String::from_utf8(encoded).unwrap();
@@ -65,17 +66,13 @@ mod tests {
 
     #[test]
     fn test_json_complex_types() {
-        use std::collections::HashMap;
-
         let codec = JsonCodec;
-        let mut map = HashMap::new();
-        map.insert("key1".to_string(), 42);
-        map.insert("key2".to_string(), 100);
+        let value = (42, "test".to_string(), true);
 
-        let encoded = codec.encode(&map).unwrap();
-        let decoded: HashMap<String, i32> = codec.decode(&encoded).unwrap();
+        let encoded = codec.encode(&value).unwrap();
+        let decoded: (i32, String, bool) = codec.decode(&encoded).unwrap();
 
-        assert_eq!(map, decoded);
+        assert_eq!(value, decoded);
     }
 
     #[test]
@@ -90,12 +87,12 @@ mod tests {
 
     #[test]
     fn test_json_nested_structures() {
-        #[derive(Debug, Serialize, Deserialize, PartialEq)]
+        #[derive(Debug, Serialize, Deserialize, Schema, PartialEq)]
         struct Inner {
             value: i32,
         }
 
-        #[derive(Debug, Serialize, Deserialize, PartialEq)]
+        #[derive(Debug, Serialize, Deserialize, Schema, PartialEq)]
         struct Outer {
             name: String,
             inner: Inner,

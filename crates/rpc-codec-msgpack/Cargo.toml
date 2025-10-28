@@ -10,3 +10,4 @@ repository.workspace = true
 rpc-core.workspace = true
 serde.workspace = true
 rmp-serde.workspace = true
+schema.workspace = true
