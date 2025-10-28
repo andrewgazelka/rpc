@@ -17,13 +17,18 @@ use syn::{ItemForeignMod, ReturnType, parse_macro_input};
 ///
 /// This generates:
 /// - `client::Client<T>` - Client implementation with typed methods
-/// - `server::Service` - Service trait to implement
+/// - `server::Service` - Low-level message-passing service trait
+/// - `server::AsyncService` - High-level async method service trait
+/// - Blanket impl to convert AsyncService -> Service
 #[proc_macro]
 pub fn rpc(input: TokenStream) -> TokenStream {
     let foreign_mod = parse_macro_input!(input as ItemForeignMod);
 
     let mut client_methods = Vec::new();
-    let mut server_methods = Vec::new();
+    let mut async_service_methods = Vec::new();
+    let mut request_structs = Vec::new();
+    let mut msg_variants = Vec::new();
+    let mut intake_match_arms = Vec::new();
     let mut dispatch_arms = Vec::new();
     let mut schema_entries = Vec::new();
 
@@ -84,12 +89,41 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 }
             });
 
-            // Generate server trait method
-            server_methods.push(quote! {
+            // Generate request struct
+            let request_struct_name = quote::format_ident!("{}Request",
+                method_name.to_string().chars().next().unwrap().to_uppercase().to_string()
+                + &method_name.to_string()[1..]);
+
+            request_structs.push(quote! {
+                #[derive(Debug, Clone)]
+                pub struct #request_struct_name {
+                    #(pub #param_names: #param_types),*
+                }
+            });
+
+            // Generate Msg enum variant
+            msg_variants.push(quote! {
+                #method_name(#request_struct_name, tokio::sync::oneshot::Sender<#return_type>)
+            });
+
+            // Generate intake match arm for blanket impl
+            let field_accesses: Vec<_> = param_names.iter().map(|name| {
+                quote! { req.#name }
+            }).collect();
+
+            intake_match_arms.push(quote! {
+                Msg::#method_name(req, tx) => {
+                    let result = self.#method_name(#(#field_accesses),*).await;
+                    let _ = tx.send(result);
+                }
+            });
+
+            // Generate AsyncService trait method
+            async_service_methods.push(quote! {
                 async fn #method_name(&self, #(#param_names: #param_types),*) -> #return_type;
             });
 
-            // Generate dispatch arm
+            // Generate dispatch arm (now uses Service::intake)
             dispatch_arms.push(quote! {
                 #method_str => {
                     let params: (#(#param_types,)*) = codec.decode(&request.params)?;
@@ -122,7 +156,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
         }
     }
 
-    // Rebuild dispatch logic properly
+    // Rebuild dispatch logic using Service::intake
     let mut final_dispatch_arms = Vec::new();
 
     for item in &foreign_mod.items {
@@ -144,13 +178,28 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 .collect();
 
             let param_types: Vec<_> = params.iter().map(|p| &p.ty).collect();
+            let param_names: Vec<_> = params.iter().map(|p| &p.pat).collect();
             let param_count = params.len();
             let indices: Vec<_> = (0..param_count).map(syn::Index::from).collect();
+
+            let _return_type = match &func.sig.output {
+                ReturnType::Default => quote! { () },
+                ReturnType::Type(_, ty) => quote! { #ty },
+            };
+
+            let request_struct_name = quote::format_ident!("{}Request",
+                method_name.to_string().chars().next().unwrap().to_uppercase().to_string()
+                + &method_name.to_string()[1..]);
 
             final_dispatch_arms.push(quote! {
                 #method_str => {
                     let params: (#(#param_types,)*) = codec.decode(&request.params)?;
-                    let result = server.#method_name(#(params.#indices),*).await;
+                    let (tx, rx) = tokio::sync::oneshot::channel();
+                    let req = #request_struct_name {
+                        #(#param_names: params.#indices),*
+                    };
+                    server.intake(Msg::#method_name(req, tx)).await;
+                    let result = rx.await.map_err(|_| rpc_core::Error::other("Service dropped response channel"))?;
                     let result_data = codec.encode(&result)?;
                     rpc_core::ResponseResult::Ok(result_data)
                 }
@@ -212,12 +261,36 @@ pub fn rpc(input: TokenStream) -> TokenStream {
         pub mod server {
             use rpc_core::{Transport, Codec, Message, RpcRequest, RpcResponse, ResponseResult};
 
-            pub trait Service: Send + Sync {
-                #(#server_methods)*
+            // Request structs
+            #(#request_structs)*
+
+            // Message enum
+            #[derive(Debug)]
+            pub enum Msg {
+                #(#msg_variants),*
+            }
+
+            // Low-level Service trait (message-passing)
+            pub trait Service: Send {
+                async fn intake(&mut self, msg: Msg);
+            }
+
+            // High-level AsyncService trait (ergonomic async methods)
+            pub trait AsyncService: Send + Sync {
+                #(#async_service_methods)*
+            }
+
+            // Blanket impl: any AsyncService can be used as a Service
+            impl<T: AsyncService> Service for T {
+                async fn intake(&mut self, msg: Msg) {
+                    match msg {
+                        #(#intake_match_arms)*
+                    }
+                }
             }
 
             pub async fn serve<S, T, C>(
-                server: S,
+                mut server: S,
                 mut transport: T,
                 codec: C,
             ) -> rpc_core::Result<()>

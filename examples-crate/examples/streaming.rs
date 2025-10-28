@@ -24,7 +24,7 @@ struct StreamingService {
     chunk_size: usize,
 }
 
-impl server::Service for StreamingService {
+impl server::AsyncService for StreamingService {
     async fn start_stream(&self, size: u64) -> u64 {
         println!("[Server] Starting stream of {} bytes", size);
         // In a real implementation, this would create a stream handle

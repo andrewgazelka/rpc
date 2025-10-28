@@ -24,7 +24,7 @@ struct UserService {
     users: std::sync::Arc<tokio::sync::Mutex<Vec<User>>>,
 }
 
-impl server::Service for UserService {
+impl server::AsyncService for UserService {
     async fn create_user(&self, username: String, email: String) -> User {
         println!("[Server] Creating user: {}", username);
 

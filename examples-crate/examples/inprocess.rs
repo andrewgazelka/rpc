@@ -19,7 +19,7 @@ rpc! {
 // Server implementation
 struct MathService;
 
-impl server::Service for MathService {
+impl server::AsyncService for MathService {
     async fn factorial(&self, n: u64) -> u64 {
         println!("[Server] Computing factorial({})", n);
         (1..=n).product()
