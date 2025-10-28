@@ -1,0 +1,19 @@
+[package]
+name = "rpc-examples"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+rpc-core.workspace = true
+rpc-server.workspace = true
+rpc-codec-json.workspace = true
+rpc-codec-msgpack.workspace = true
+rpc-transport-ws.workspace = true
+rpc-transport-stdio.workspace = true
+rpc-transport-inprocess.workspace = true
+tokio.workspace = true
+serde.workspace = true

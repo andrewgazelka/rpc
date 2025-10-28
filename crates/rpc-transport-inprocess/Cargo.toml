@@ -1,0 +1,11 @@
+[package]
+name = "rpc-transport-inprocess"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+rpc-core.workspace = true
+tokio.workspace = true
