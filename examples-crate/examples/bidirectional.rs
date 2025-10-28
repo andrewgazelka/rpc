@@ -33,12 +33,12 @@ mod callback {
 struct TaskProcessor;
 
 impl server::AsyncService for TaskProcessor {
-    async fn process_task(&self, task_id: u64, data: String) -> String {
+    async fn process_task(&mut self, task_id: u64, data: String) -> String {
         println!("[Server] Processing task {} with data: {}", task_id, data);
         format!("Processed: {}", data)
     }
 
-    async fn get_status(&self) -> String {
+    async fn get_status(&mut self) -> String {
         println!("[Server] Status requested");
         "Server is running".to_string()
     }
@@ -48,18 +48,18 @@ impl server::AsyncService for TaskProcessor {
 struct ClientCallbacks;
 
 impl callback::server::AsyncService for ClientCallbacks {
-    async fn on_progress(&self, task_id: u64, percent: f64) {
+    async fn on_progress(&mut self, task_id: u64, percent: f64) {
         println!(
             "[Client Callback] Task {} progress: {:.1}%",
             task_id, percent
         );
     }
 
-    async fn on_complete(&self, task_id: u64, result: String) {
+    async fn on_complete(&mut self, task_id: u64, result: String) {
         println!("[Client Callback] Task {} completed: {}", task_id, result);
     }
 
-    async fn log_message(&self, level: String, message: String) {
+    async fn log_message(&mut self, level: String, message: String) {
         println!("[Client Callback] [{}] {}", level, message);
     }
 }

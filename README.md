@@ -53,13 +53,29 @@ rpc! {
     }
 }
 
-// Implement server
+// Implement server (async methods - ergonomic)
 struct MyService;
 
 impl server::AsyncService for MyService {
-    async fn add(&self, a: i32, b: i32) -> i32 { a + b }
-    async fn greet(&self, name: String) -> String {
+    async fn add(&mut self, a: i32, b: i32) -> i32 { a + b }
+    async fn greet(&mut self, name: String) -> String {
         format!("Hello, {}!", name)
+    }
+}
+
+// OR implement Service directly (message-passing - actor pattern)
+struct MyService;
+
+impl server::Service for MyService {
+    async fn intake(&mut self, msg: server::Msg) {
+        match msg {
+            server::Msg::add(req, tx) => {
+                let _ = tx.send(req.a + req.b);
+            }
+            server::Msg::greet(req, tx) => {
+                let _ = tx.send(format!("Hello, {}!", req.name));
+            }
+        }
     }
 }
 

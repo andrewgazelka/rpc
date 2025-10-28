@@ -120,7 +120,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
 
             // Generate AsyncService trait method
             async_service_methods.push(quote! {
-                async fn #method_name(&self, #(#param_names: #param_types),*) -> #return_type;
+                async fn #method_name(&mut self, #(#param_names: #param_types),*) -> #return_type;
             });
 
             // Generate dispatch arm (now uses Service::intake)
@@ -276,7 +276,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
             }
 
             // High-level AsyncService trait (ergonomic async methods)
-            pub trait AsyncService: Send + Sync {
+            pub trait AsyncService: Send {
                 #(#async_service_methods)*
             }
 

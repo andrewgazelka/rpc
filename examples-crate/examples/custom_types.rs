@@ -25,7 +25,7 @@ struct UserService {
 }
 
 impl server::AsyncService for UserService {
-    async fn create_user(&self, username: String, email: String) -> User {
+    async fn create_user(&mut self, username: String, email: String) -> User {
         println!("[Server] Creating user: {}", username);
 
         let mut users = self.users.lock().await;
@@ -51,13 +51,13 @@ impl server::AsyncService for UserService {
         user
     }
 
-    async fn get_user(&self, id: u64) -> Option<User> {
+    async fn get_user(&mut self, id: u64) -> Option<User> {
         println!("[Server] Fetching user {}", id);
         let users = self.users.lock().await;
         users.iter().find(|u| u.id == id).cloned()
     }
 
-    async fn update_preferences(&self, user_id: u64, prefs: Preferences) -> User {
+    async fn update_preferences(&mut self, user_id: u64, prefs: Preferences) -> User {
         println!("[Server] Updating preferences for user {}", user_id);
         let mut users = self.users.lock().await;
 
@@ -66,7 +66,7 @@ impl server::AsyncService for UserService {
         user.clone()
     }
 
-    async fn process_transaction(&self, tx: Transaction) -> TransactionResult {
+    async fn process_transaction(&mut self, tx: Transaction) -> TransactionResult {
         println!(
             "[Server] Processing transaction: {} -> {} ({} {})",
             tx.from, tx.to, tx.amount, tx.currency
@@ -89,7 +89,7 @@ impl server::AsyncService for UserService {
         }
     }
 
-    async fn list_users_by_role(&self, role: Role) -> Vec<User> {
+    async fn list_users_by_role(&mut self, role: Role) -> Vec<User> {
         println!("[Server] Listing users with role: {:?}", role);
         let users = self.users.lock().await;
         users

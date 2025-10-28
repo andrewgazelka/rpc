@@ -19,17 +19,17 @@ rpc! {
 struct Calculator;
 
 impl server::AsyncService for Calculator {
-    async fn add(&self, a: i32, b: i32) -> i32 {
+    async fn add(&mut self, a: i32, b: i32) -> i32 {
         println!("[Server] Computing {} + {}", a, b);
         a + b
     }
 
-    async fn greet(&self, name: String) -> String {
+    async fn greet(&mut self, name: String) -> String {
         println!("[Server] Greeting {}", name);
         format!("Hello, {}!", name)
     }
 
-    async fn echo(&self, msg: String) -> String {
+    async fn echo(&mut self, msg: String) -> String {
         println!("[Server] Echoing: {}", msg);
         msg
     }
