@@ -2,6 +2,8 @@
 
 **Decomposed, pluggable RPC framework**
 
+Schema generation powered by [schema](https://github.com/andrewgazelka/schema) - like serde, but for structure instead of serialization.
+
 ## Why?
 
 |  | gRPC | JSON-RPC | Cap'n Proto | Cap'n Web | tarpc | UniFFI | **This** |
