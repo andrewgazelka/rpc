@@ -15,3 +15,6 @@ tokio.workspace = true
 rpc-codec-json.workspace = true
 rpc-codec-msgpack.workspace = true
 rpc-transport-ws.workspace = true
+schema.workspace = true
+schema-openapi.workspace = true
+serde_json.workspace = true

@@ -18,7 +18,7 @@ rpc! {
 // Implement the server
 struct Calculator;
 
-impl server::Server for Calculator {
+impl server::Service for Calculator {
     async fn add(&self, a: i32, b: i32) -> i32 {
         println!("[Server] Computing {} + {}", a, b);
         a + b

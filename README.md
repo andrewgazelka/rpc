@@ -56,7 +56,7 @@ rpc! {
 // Implement server
 struct MyService;
 
-impl server::Server for MyService {
+impl server::Service for MyService {
     async fn add(&self, a: i32, b: i32) -> i32 { a + b }
     async fn greet(&self, name: String) -> String {
         format!("Hello, {}!", name)

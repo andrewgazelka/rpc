@@ -21,7 +21,7 @@ rpc! {
 // Server implementation
 struct DataService;
 
-impl server::Server for DataService {
+impl server::Service for DataService {
     async fn compress(&self, data: Vec<u8>) -> Vec<u8> {
         println!("[Server] Compressing {} bytes", data.len());
         // Simple run-length encoding simulation

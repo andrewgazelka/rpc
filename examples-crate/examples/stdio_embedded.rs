@@ -20,7 +20,7 @@ rpc! {
 // Server implementation
 struct DataProcessor;
 
-impl server::Server for DataProcessor {
+impl server::Service for DataProcessor {
     async fn process_data(&self, data: Vec<u8>) -> Vec<u8> {
         // Simple transformation: reverse the bytes
         data.into_iter().rev().collect()

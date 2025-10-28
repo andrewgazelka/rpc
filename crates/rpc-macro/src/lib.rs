@@ -17,7 +17,7 @@ use syn::{ItemForeignMod, ReturnType, parse_macro_input};
 ///
 /// This generates:
 /// - `client::Client<T>` - Client implementation with typed methods
-/// - `server::Server` - Server trait to implement
+/// - `server::Service` - Service trait to implement
 #[proc_macro]
 pub fn rpc(input: TokenStream) -> TokenStream {
     let foreign_mod = parse_macro_input!(input as ItemForeignMod);
@@ -212,7 +212,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
         pub mod server {
             use rpc_core::{Transport, Codec, Message, RpcRequest, RpcResponse, ResponseResult};
 
-            pub trait Server: Send + Sync {
+            pub trait Service: Send + Sync {
                 #(#server_methods)*
             }
 
@@ -222,7 +222,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 codec: C,
             ) -> rpc_core::Result<()>
             where
-                S: Server + 'static,
+                S: Service + 'static,
                 T: Transport + 'static,
                 C: Codec + 'static,
             {

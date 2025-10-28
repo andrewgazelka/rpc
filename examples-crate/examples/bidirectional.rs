@@ -32,7 +32,7 @@ mod callback {
 // Server implementation
 struct TaskProcessor;
 
-impl server::Server for TaskProcessor {
+impl server::Service for TaskProcessor {
     async fn process_task(&self, task_id: u64, data: String) -> String {
         println!("[Server] Processing task {} with data: {}", task_id, data);
         format!("Processed: {}", data)
@@ -47,7 +47,7 @@ impl server::Server for TaskProcessor {
 // Client implementation (receives callbacks from server)
 struct ClientCallbacks;
 
-impl callback::server::Server for ClientCallbacks {
+impl callback::server::Service for ClientCallbacks {
     async fn on_progress(&self, task_id: u64, percent: f64) {
         println!(
             "[Client Callback] Task {} progress: {:.1}%",
