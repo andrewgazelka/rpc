@@ -6,6 +6,7 @@ pub use rpc_core;
 pub use rpc_macro::rpc;
 
 #[cfg(test)]
+#[allow(unexpected_cfgs)]
 mod tests {
     use super::*;
 

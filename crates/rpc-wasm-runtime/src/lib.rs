@@ -54,6 +54,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Runtime state that holds the RPC client and WASI context
+#[allow(dead_code)]
 pub struct RuntimeState<T, C>
 where
     T: Transport + 'static,

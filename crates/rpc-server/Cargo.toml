@@ -9,9 +9,11 @@ repository.workspace = true
 [dependencies]
 rpc-core.workspace = true
 rpc-macro.workspace = true
+tracing = { workspace = true, optional = true }
 
 [features]
-default = []
+default = ["tracing"]
+tracing = ["dep:tracing", "rpc-core/tracing", "rpc-macro/tracing"]
 wit = ["rpc-macro/wit"]
 openapi = ["rpc-macro/openapi"]
 
@@ -24,3 +26,4 @@ schema.workspace = true
 schema-openapi.workspace = true
 schema-wit.workspace = true
 serde_json.workspace = true
+tracing.workspace = true

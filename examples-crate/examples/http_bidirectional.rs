@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start HTTP server
     let listener = HttpListener::bind("127.0.0.1:8080").await?;
-    let mut server_transport = listener.serve().await?;
+    let server_transport = listener.serve().await?;
     let addr = server_transport.local_addr();
 
     println!("[Server] HTTP server listening on http://{}\n", addr);

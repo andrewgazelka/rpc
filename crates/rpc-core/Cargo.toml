@@ -7,7 +7,7 @@ authors.workspace = true
 repository.workspace = true
 
 [features]
-default = []
+default = ["tracing"]
 tracing = ["dep:tracing"]
 
 [dependencies]

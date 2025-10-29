@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 rpc-core.workspace = true
-rpc-server = { workspace = true, features = ["openapi", "wit"] }
+rpc-server.workspace = true
 rpc-codec-json.workspace = true
 rpc-codec-msgpack.workspace = true
 rpc-transport-ws.workspace = true
@@ -30,3 +30,11 @@ default = []
 wit = ["rpc-server/wit", "schema-wit"]
 wasm = ["rpc-wasm-runtime", "wit"]
 openapi = ["rpc-server/openapi", "schema-openapi"]
+
+[[example]]
+name = "wit_gen"
+required-features = ["wit"]
+
+[[example]]
+name = "openapi_gen"
+required-features = ["openapi"]

@@ -19,6 +19,7 @@ schema-openapi = { workspace = true, optional = true }
 
 [features]
 default = []
+tracing = []
 wit = ["schema-wit"]
 openapi = ["schema-openapi"]
 
