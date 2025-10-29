@@ -11,3 +11,6 @@ rpc-core.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true
 futures.workspace = true
+
+[dev-dependencies]
+rpc-codec-json.workspace = true

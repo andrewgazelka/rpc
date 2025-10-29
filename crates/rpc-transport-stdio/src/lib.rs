@@ -195,7 +195,7 @@ mod tests {
         t1.send(msg).await.unwrap();
         let received = t2.recv().await.unwrap();
 
-        assert_eq!(received.data, vec![]);
+        assert_eq!(received.data, Vec::<u8>::new());
     }
 
     #[tokio::test]

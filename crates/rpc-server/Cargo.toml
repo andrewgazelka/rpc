@@ -17,4 +17,5 @@ rpc-codec-msgpack.workspace = true
 rpc-transport-ws.workspace = true
 schema.workspace = true
 schema-openapi.workspace = true
+schema-wit.workspace = true
 serde_json.workspace = true

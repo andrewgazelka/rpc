@@ -90,6 +90,10 @@ pub enum ResponseResult {
     Ok(Vec<u8>),
     /// Error result with message
     Err(String),
+    /// Stream chunk with data (not final)
+    StreamChunk(Vec<u8>),
+    /// Stream end marker (final chunk)
+    StreamEnd,
 }
 
 impl fmt::Display for ResponseResult {
@@ -97,6 +101,8 @@ impl fmt::Display for ResponseResult {
         match self {
             ResponseResult::Ok(_) => write!(f, "Ok"),
             ResponseResult::Err(e) => write!(f, "Err: {}", e),
+            ResponseResult::StreamChunk(_) => write!(f, "StreamChunk"),
+            ResponseResult::StreamEnd => write!(f, "StreamEnd"),
         }
     }
 }
@@ -140,5 +146,39 @@ mod tests {
 
         let err_result = ResponseResult::Err("test error".to_string());
         assert_eq!(err_result.to_string(), "Err: test error");
+
+        let chunk_result = ResponseResult::StreamChunk(vec![4, 5, 6]);
+        assert_eq!(chunk_result.to_string(), "StreamChunk");
+
+        let end_result = ResponseResult::StreamEnd;
+        assert_eq!(end_result.to_string(), "StreamEnd");
+    }
+
+    #[test]
+    fn test_streaming_response_serialization() {
+        let chunk_response = RpcResponse {
+            id: 42,
+            result: ResponseResult::StreamChunk(vec![1, 2, 3]),
+        };
+
+        let serialized = serde_json::to_vec(&chunk_response).unwrap();
+        let deserialized: RpcResponse = serde_json::from_slice(&serialized).unwrap();
+
+        assert_eq!(deserialized.id, 42);
+        match deserialized.result {
+            ResponseResult::StreamChunk(data) => assert_eq!(data, vec![1, 2, 3]),
+            _ => panic!("Expected StreamChunk"),
+        }
+
+        let end_response = RpcResponse {
+            id: 43,
+            result: ResponseResult::StreamEnd,
+        };
+
+        let serialized = serde_json::to_vec(&end_response).unwrap();
+        let deserialized: RpcResponse = serde_json::from_slice(&serialized).unwrap();
+
+        assert_eq!(deserialized.id, 43);
+        assert!(matches!(deserialized.result, ResponseResult::StreamEnd));
     }
 }

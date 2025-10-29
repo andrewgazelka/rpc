@@ -87,6 +87,12 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                         rpc_core::ResponseResult::Err(e) => {
                             Err(rpc_core::Error::remote(e))
                         }
+                        rpc_core::ResponseResult::StreamChunk(_) => {
+                            Err(rpc_core::Error::other("unexpected stream chunk in non-streaming call"))
+                        }
+                        rpc_core::ResponseResult::StreamEnd => {
+                            Err(rpc_core::Error::other("unexpected stream end in non-streaming call"))
+                        }
                     }
                 }
             });
