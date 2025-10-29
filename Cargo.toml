@@ -10,13 +10,17 @@ members = [
     "crates/rpc-transport-inprocess",
     "crates/rpc-server",
     "crates/rpc-openapi",
+    "crates/rpc-wasm-runtime",
     "examples-crate",
+]
+exclude = [
+    "tests/wasm-kernel/guest",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.75"
+rust-version = "1.85"
 license = "MIT"
 authors = ["Andrew Gazelka"]
 repository = "https://github.com/andrewgazelka/rpc"
@@ -32,8 +36,9 @@ serde_json = "1.0"
 rmp-serde = "1.3"
 
 # Schema
-schema = { path = "/Users/andrewgazelka/Projects/superglide/schema/schema" }
-schema-openapi = { path = "/Users/andrewgazelka/Projects/superglide/schema/schema-openapi" }
+schema = { git = "https://github.com/andrewgazelka/schema" }
+schema-openapi = { git = "https://github.com/andrewgazelka/schema" }
+schema-wit = { git = "https://github.com/andrewgazelka/schema" }
 
 # WebSocket
 tokio = { version = "1.42", features = ["full"] }
@@ -54,6 +59,7 @@ rpc-transport-stdio = { path = "crates/rpc-transport-stdio" }
 rpc-transport-inprocess = { path = "crates/rpc-transport-inprocess" }
 rpc-server = { path = "crates/rpc-server" }
 rpc-openapi = { path = "crates/rpc-openapi" }
+rpc-wasm-runtime = { path = "crates/rpc-wasm-runtime" }
 
 [profile.dev]
 opt-level = 0

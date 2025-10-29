@@ -1,24 +1,28 @@
 [package]
-name = "rpc-examples"
+name = "rpc-wasm-runtime"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-publish = false
 
 [dependencies]
 rpc-core.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+tokio.workspace = true
+
+# Wasmtime dependencies
+wasmtime = { version = "28.0", features = ["component-model", "async"] }
+wasmtime-wasi = "28.0"
+
+[dev-dependencies]
+serde_json.workspace = true
 rpc-server.workspace = true
 rpc-codec-json.workspace = true
-rpc-codec-msgpack.workspace = true
-rpc-transport-ws.workspace = true
-rpc-transport-stdio.workspace = true
 rpc-transport-inprocess.workspace = true
-rpc-openapi.workspace = true
-tokio.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 schema.workspace = true
 schema-openapi.workspace = true
 schema-wit.workspace = true
+async-trait = "0.1"

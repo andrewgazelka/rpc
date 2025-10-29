@@ -1,0 +1,21 @@
+package rpc:kernel;
+
+// Counter RPC interface
+interface counter {
+    increment: func(value: u32) -> u32;
+    get-value: func() -> u32;
+}
+
+// Kernel interface
+interface kernel {
+    run: func() -> u32;
+}
+
+// World for a kernel that can call counter methods
+world counter-kernel {
+    // The kernel imports (can call) the counter RPC methods
+    import counter;
+
+    // The kernel exports the kernel interface
+    export kernel;
+}

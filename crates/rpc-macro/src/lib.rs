@@ -3,6 +3,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{ItemForeignMod, ReturnType, parse_macro_input};
+use std::collections::HashMap;
 
 /// Generate RPC client and server traits from a function signature list.
 ///
@@ -31,6 +32,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
     let mut intake_match_arms = Vec::new();
     let mut dispatch_arms = Vec::new();
     let mut schema_entries = Vec::new();
+    let mut wit_methods = Vec::new();
 
     for item in &foreign_mod.items {
         if let syn::ForeignItem::Fn(func) = item {
@@ -143,14 +145,57 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                             name: #method_str.to_string(),
                             params: {
                                 let schema_type = <(#(#param_types,)*)>::schema();
-                                ::schema_openapi::to_openapi_schema(&schema_type)
+                                ::schema_openapi::schema_type_to_openapi(&schema_type)
                             },
                             returns: {
                                 let schema_type = <#return_type>::schema();
-                                ::schema_openapi::to_openapi_schema(&schema_type)
+                                ::schema_openapi::schema_type_to_openapi(&schema_type)
                             },
                         }
                     );
+                }
+            });
+
+            // Generate WIT method signature
+            // Convert param names to strings for WIT generation
+            let param_name_strs: Vec<_> = param_names.iter().map(|p| {
+                // Extract identifier from pattern
+                quote! { stringify!(#p) }.to_string()
+            }).collect();
+
+            wit_methods.push(quote! {
+                {
+                    use ::schema::Schema;
+                    use ::schema_wit::schema_type_to_wit;
+
+                    wit_output.push_str(&format!("    {}: func(", #method_str));
+
+                    // Generate parameter list with names
+                    let param_parts: Vec<String> = vec![
+                        #(
+                            {
+                                let param_schema = <#param_types>::schema();
+                                let param_wit = schema_type_to_wit(&param_schema, None);
+                                format!("{}: {}", stringify!(#param_names), param_wit)
+                            }
+                        ),*
+                    ];
+
+                    wit_output.push_str(&param_parts.join(", "));
+                    wit_output.push(')');
+
+                    // Only add return type if it's not unit ()
+                    let return_schema = <#return_type>::schema();
+                    // Check if it's an empty object (unit type)
+                    let is_unit = matches!(&return_schema.kind, ::schema::TypeKind::Object { properties, required } if properties.is_empty() && required.is_empty());
+
+                    if !is_unit {
+                        let return_wit = schema_type_to_wit(&return_schema, None);
+                        wit_output.push_str(" -> ");
+                        wit_output.push_str(&return_wit);
+                    }
+
+                    wit_output.push('\n');
                 }
             });
         }
@@ -252,6 +297,15 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     let mut schema_map = HashMap::new();
                     #(#schema_entries)*
                     schema_map
+                }
+
+                /// Generate WIT (WebAssembly Interface Type) definition for this RPC interface
+                pub fn wit_schema(interface_name: &str) -> String {
+                    let mut wit_output = String::new();
+                    wit_output.push_str(&format!("interface {} {{\n", interface_name));
+                    #(#wit_methods)*
+                    wit_output.push_str("}\n");
+                    wit_output
                 }
 
                 #(#client_methods)*
