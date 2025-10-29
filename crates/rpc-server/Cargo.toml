@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 rpc-core.workspace = true
 rpc-macro.workspace = true
+futures.workspace = true
 tracing = { workspace = true, optional = true }
 
 [features]

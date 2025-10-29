@@ -33,3 +33,4 @@ serde_json = { workspace = true }
 schema.workspace = true
 schema-openapi.workspace = true
 tokio = { workspace = true, features = ["full"] }
+futures.workspace = true

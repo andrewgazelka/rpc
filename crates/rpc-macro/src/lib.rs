@@ -367,6 +367,68 @@ pub fn rpc(input: TokenStream) -> TokenStream {
             {
                 #(#dyn_client_impl_methods)*
             }
+
+            /// Dynamic client that accepts method names as strings at runtime
+            pub struct DynamicClient<T, C>
+            where
+                T: Transport + 'static,
+                C: Codec + 'static,
+            {
+                transport: Arc<Mutex<T>>,
+                codec: Arc<C>,
+                next_id: Arc<AtomicU64>,
+            }
+
+            impl<T, C> DynamicClient<T, C>
+            where
+                T: Transport + 'static,
+                C: Codec + 'static,
+            {
+                pub fn new(transport: T, codec: C) -> Self {
+                    Self {
+                        transport: Arc::new(Mutex::new(transport)),
+                        codec: Arc::new(codec),
+                        next_id: Arc::new(AtomicU64::new(1)),
+                    }
+                }
+
+                /// Make a single RPC call with dynamic method name
+                pub async fn call(&self, method: &str, params: Vec<u8>) -> rpc_core::Result<Vec<u8>> {
+                    let request_id = self.next_id.fetch_add(1, Ordering::SeqCst);
+                    let request = RpcRequest {
+                        id: request_id,
+                        method: method.to_string(),
+                        params,
+                    };
+
+                    let request_data = self.codec.encode(&request)?;
+                    let request_msg = Message::new(request_data);
+
+                    let mut transport = self.transport.lock().await;
+                    transport.send(request_msg).await.map_err(rpc_core::Error::transport)?;
+
+                    let response_msg = transport.recv().await.map_err(rpc_core::Error::transport)?;
+                    drop(transport);
+
+                    let response: RpcResponse = self.codec.decode(&response_msg.data)?;
+
+                    if response.id != request_id {
+                        return Err(rpc_core::Error::other("response ID mismatch"));
+                    }
+
+                    match response.result {
+                        ResponseResult::Ok(data) => Ok(data),
+                        ResponseResult::Err(e) => Err(rpc_core::Error::remote(e)),
+                        ResponseResult::StreamChunk(_) => {
+                            Err(rpc_core::Error::other("unexpected stream chunk in non-streaming call"))
+                        }
+                        ResponseResult::StreamEnd => {
+                            Err(rpc_core::Error::other("unexpected stream end in non-streaming call"))
+                        }
+                    }
+                }
+
+            }
         }
 
         pub mod server {
