@@ -28,6 +28,31 @@ runtime.execute(kernel_bytes, transport, codec).await?;
 
 WASM kernel: 14KB, sandboxed via wasmtime.
 
+## CPU time limiting
+
+Servers enforce maximum kernel execution time using epoch-based interruption:
+
+```rust
+use std::time::Duration;
+use rpc_wasm_runtime::WasmRuntime;
+
+// Server creates runtime with maximum 5 second timeout (enforced server-side)
+let mut runtime = WasmRuntime::new(Duration::from_secs(5))?;
+
+// Client can request shorter timeout, but not longer than server maximum
+runtime.execute(kernel_bytes, transport, codec, Some(Duration::from_millis(500))).await?;
+
+// Server maximum is enforced if client requests longer or no timeout
+runtime.execute(kernel_bytes, transport, codec, Some(Duration::from_secs(10))).await?;  // Capped at 5s
+runtime.execute(kernel_bytes, transport, codec, None).await?;  // Uses 5s default
+```
+
+Timeout behavior:
+- Server sets `max_timeout` when creating `WasmRuntime`
+- Actual timeout: `min(client_requested, server_max)`
+- Prevents malicious clients from monopolizing resources
+- Epoch interruption has approximately 10% overhead (vs 2-3x for fuel-based limiting)
+
 ## Example: data aggregation
 
 ```rust
