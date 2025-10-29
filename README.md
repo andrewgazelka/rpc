@@ -5,28 +5,32 @@ RPC framework with server-side WASM composition. Write Rust once, get WIT/OpenAP
 ## Server-side composition
 
 ```rust
-// 100 network round-trips
-for i in 0..100 {
-    client.increment(i).await?;
+// Find friends-of-friends within 2 hops
+// Without kernel: N round-trips (one per friend)
+let user = client.get_user(id).await?;
+let mut friends_of_friends = HashSet::new();
+for friend_id in user.friends {
+    let friend = client.get_user(friend_id).await?;
+    friends_of_friends.extend(friend.friends);
 }
 
-// 1 network round-trip - execute kernel server-side
-wit_bindgen::generate!({ world: "counter-kernel" });
+// With kernel: 1 round-trip
+wit_bindgen::generate!({ world: "social-kernel" });
 
 impl Guest for Kernel {
-    fn run() -> u32 {
-        let mut value = 0;
-        for _ in 0..100 {
-            value = counter::increment(value);
-        }
-        value
+    fn run(id: UserId) -> HashSet<UserId> {
+        let user = social::get_user(id);
+        user.friends
+            .into_iter()
+            .flat_map(|fid| social::get_user(fid).friends)
+            .collect()
     }
 }
 
 runtime.execute(kernel_bytes, transport, codec).await?;
 ```
 
-WASM kernel: 14KB, sandboxed via wasmtime.
+WASM kernel: 14KB, sandboxed via wasmtime. For a user with 50 friends, reduces 50 round-trips to 1.
 
 ## Kernel caching
 
