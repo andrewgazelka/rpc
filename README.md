@@ -56,6 +56,13 @@ Cache behavior:
 - Frequently used kernels stay hot
 - Reduces network overhead for repeated executions
 
+Network cost:
+- First execution: 32 bytes (hash) + 14KB (binary on cache miss) = ~14KB
+- Subsequent executions: 32 bytes (hash only)
+- After 2 executions: amortized 7KB per call
+- After 10 executions: amortized 1.4KB per call
+- After 100 executions: amortized 140 bytes per call
+
 ## CPU time limiting
 
 Servers enforce maximum kernel execution time using epoch-based interruption:
