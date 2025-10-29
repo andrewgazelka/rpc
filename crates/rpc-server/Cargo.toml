@@ -10,6 +10,11 @@ repository.workspace = true
 rpc-core.workspace = true
 rpc-macro.workspace = true
 
+[features]
+default = []
+wit = ["rpc-macro/wit"]
+openapi = ["rpc-macro/openapi"]
+
 [dev-dependencies]
 tokio.workspace = true
 rpc-codec-json.workspace = true

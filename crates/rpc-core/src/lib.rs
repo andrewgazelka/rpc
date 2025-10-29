@@ -39,15 +39,18 @@ impl Message {
 /// communication mechanism (WebSocket, HTTP, TCP, IPC, etc.).
 #[allow(async_fn_in_trait)]
 pub trait Transport: Send {
+    /// Transport-specific error type
+    type Error: std::error::Error + Send + Sync + 'static;
+
     /// Send a message through the transport
-    async fn send(&mut self, msg: Message) -> Result<()>;
+    fn send(&mut self, msg: Message) -> impl std::future::Future<Output = std::result::Result<(), Self::Error>> + Send;
 
     /// Receive a message from the transport
-    async fn recv(&mut self) -> Result<Message>;
+    fn recv(&mut self) -> impl std::future::Future<Output = std::result::Result<Message, Self::Error>> + Send;
 
     /// Close the transport gracefully
-    async fn close(&mut self) -> Result<()> {
-        Ok(())
+    fn close(&mut self) -> impl std::future::Future<Output = std::result::Result<(), Self::Error>> + Send {
+        async { Ok(()) }
     }
 }
 

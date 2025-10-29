@@ -8,9 +8,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Errors that can occur in RPC operations
 #[derive(Error, Debug)]
 pub enum Error {
-    /// Transport layer error
+    /// Transport layer error (boxed to support any transport error type)
     #[error("transport error: {0}")]
-    Transport(String),
+    Transport(Box<dyn std::error::Error + Send + Sync>),
 
     /// Codec/serialization error
     #[error("codec error: {0}")]
@@ -42,9 +42,22 @@ pub enum Error {
 }
 
 impl Error {
-    /// Create a transport error
-    pub fn transport(msg: impl Into<String>) -> Self {
-        Error::Transport(msg.into())
+    /// Create a transport error from any error type
+    pub fn transport(err: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Error::Transport(Box::new(err))
+    }
+
+    /// Create a transport error from a string message
+    pub fn transport_msg(msg: impl Into<String>) -> Self {
+        #[derive(Debug)]
+        struct TransportError(String);
+        impl std::fmt::Display for TransportError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+        impl std::error::Error for TransportError {}
+        Error::Transport(Box::new(TransportError(msg.into())))
     }
 
     /// Create a codec error
@@ -73,13 +86,14 @@ impl Error {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_error_display() {
-        let err = Error::transport("connection failed");
+        let err = Error::transport_msg("connection failed");
         assert_eq!(err.to_string(), "transport error: connection failed");
 
         let err = Error::codec("invalid json");
@@ -91,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_error_constructors() {
-        let err = Error::transport("test");
+        let err = Error::transport_msg("test");
         assert!(matches!(err, Error::Transport(_)));
 
         let err = Error::codec("test");

@@ -1,0 +1,29 @@
+[package]
+name = "rpc-transport-http"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+rpc-core.workspace = true
+tokio.workspace = true
+futures.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+# HTTP server and client
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
+hyper = { version = "1.5", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+http-body-util = "0.1"
+
+# SSE support
+async-stream = "0.3"
+
+[dev-dependencies]
+rpc-codec-json.workspace = true

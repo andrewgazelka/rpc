@@ -3,12 +3,32 @@
 //! Provides WebSocket-based transport implementation using tokio-tungstenite.
 
 use futures::{SinkExt, StreamExt};
-use rpc_core::{Error, Message, Result, Transport};
+use rpc_core::{Message, Transport};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, accept_async, connect_async,
     tungstenite::protocol::Message as WsMessage,
 };
+
+/// WebSocket transport error type
+#[derive(Debug, thiserror::Error)]
+pub enum WebSocketError {
+    /// WebSocket protocol error
+    #[error("WebSocket error: {0}")]
+    WebSocket(#[from] tokio_tungstenite::tungstenite::Error),
+
+    /// Connection closed
+    #[error("connection closed")]
+    ConnectionClosed,
+
+    /// Unexpected message type received
+    #[error("unexpected message type")]
+    UnexpectedMessageType,
+
+    /// IO error
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
 
 /// WebSocket transport implementation.
 ///
@@ -28,45 +48,42 @@ impl WebSocketTransport {
     /// # Examples
     ///
     /// ```no_run
-    /// # async fn example() -> rpc_core::Result<()> {
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// use rpc_transport_ws::WebSocketTransport;
     ///
     /// let transport = WebSocketTransport::connect("ws://127.0.0.1:8080").await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn connect(url: &str) -> Result<Self> {
-        let (ws, _) = connect_async(url)
-            .await
-            .map_err(|e| Error::transport(format!("WebSocket connect error: {}", e)))?;
-
+    pub async fn connect(url: &str) -> Result<Self, WebSocketError> {
+        let (ws, _) = connect_async(url).await?;
         Ok(Self { ws })
     }
 }
 
 impl Transport for WebSocketTransport {
-    async fn send(&mut self, msg: Message) -> Result<()> {
+    type Error = WebSocketError;
+
+    async fn send(&mut self, msg: Message) -> Result<(), Self::Error> {
         self.ws
             .send(WsMessage::Binary(msg.data))
-            .await
-            .map_err(|e| Error::transport(format!("WebSocket send error: {}", e)))
+            .await?;
+        Ok(())
     }
 
-    async fn recv(&mut self) -> Result<Message> {
+    async fn recv(&mut self) -> Result<Message, Self::Error> {
         match self.ws.next().await {
             Some(Ok(WsMessage::Binary(data))) => Ok(Message::new(data)),
-            Some(Ok(WsMessage::Close(_))) => Err(Error::ConnectionClosed),
-            Some(Ok(_)) => Err(Error::transport("unexpected message type")),
-            Some(Err(e)) => Err(Error::transport(format!("WebSocket recv error: {}", e))),
-            None => Err(Error::ConnectionClosed),
+            Some(Ok(WsMessage::Close(_))) => Err(WebSocketError::ConnectionClosed),
+            Some(Ok(_)) => Err(WebSocketError::UnexpectedMessageType),
+            Some(Err(e)) => Err(WebSocketError::WebSocket(e)),
+            None => Err(WebSocketError::ConnectionClosed),
         }
     }
 
-    async fn close(&mut self) -> Result<()> {
-        self.ws
-            .close(None)
-            .await
-            .map_err(|e| Error::transport(format!("WebSocket close error: {}", e)))
+    async fn close(&mut self) -> Result<(), Self::Error> {
+        self.ws.close(None).await?;
+        Ok(())
     }
 }
 
@@ -83,29 +100,21 @@ impl WebSocketListener {
     /// # Examples
     ///
     /// ```no_run
-    /// # async fn example() -> rpc_core::Result<()> {
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// use rpc_transport_ws::WebSocketListener;
     ///
     /// let listener = WebSocketListener::bind("127.0.0.1:8080").await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn bind(addr: &str) -> Result<Self> {
-        let listener = TcpListener::bind(addr)
-            .await
-            .map_err(|e| Error::transport(format!("Failed to bind: {}", e)))?;
-
+    pub async fn bind(addr: &str) -> Result<Self, WebSocketError> {
+        let listener = TcpListener::bind(addr).await?;
         Ok(Self { listener })
     }
 
     /// Accept an incoming connection and create a WebSocket transport.
-    pub async fn accept(&self) -> Result<WebSocketServerTransport> {
-        let (stream, _) = self
-            .listener
-            .accept()
-            .await
-            .map_err(|e| Error::transport(format!("Failed to accept: {}", e)))?;
-
+    pub async fn accept(&self) -> Result<WebSocketServerTransport, WebSocketError> {
+        let (stream, _) = self.listener.accept().await?;
         WebSocketServerTransport::from_stream(stream).await
     }
 }
@@ -114,38 +123,35 @@ impl WebSocketServerTransport {
     /// Create a WebSocket transport from an accepted connection.
     ///
     /// Used on the server side after accepting a TCP connection.
-    pub async fn from_stream(stream: TcpStream) -> Result<Self> {
-        let ws = accept_async(stream)
-            .await
-            .map_err(|e| Error::transport(format!("WebSocket accept error: {}", e)))?;
-
+    pub async fn from_stream(stream: TcpStream) -> Result<Self, WebSocketError> {
+        let ws = accept_async(stream).await?;
         Ok(Self { ws })
     }
 }
 
 impl Transport for WebSocketServerTransport {
-    async fn send(&mut self, msg: Message) -> Result<()> {
+    type Error = WebSocketError;
+
+    async fn send(&mut self, msg: Message) -> Result<(), Self::Error> {
         self.ws
             .send(WsMessage::Binary(msg.data))
-            .await
-            .map_err(|e| Error::transport(format!("WebSocket send error: {}", e)))
+            .await?;
+        Ok(())
     }
 
-    async fn recv(&mut self) -> Result<Message> {
+    async fn recv(&mut self) -> Result<Message, Self::Error> {
         match self.ws.next().await {
             Some(Ok(WsMessage::Binary(data))) => Ok(Message::new(data)),
-            Some(Ok(WsMessage::Close(_))) => Err(Error::ConnectionClosed),
-            Some(Ok(_)) => Err(Error::transport("unexpected message type")),
-            Some(Err(e)) => Err(Error::transport(format!("WebSocket recv error: {}", e))),
-            None => Err(Error::ConnectionClosed),
+            Some(Ok(WsMessage::Close(_))) => Err(WebSocketError::ConnectionClosed),
+            Some(Ok(_)) => Err(WebSocketError::UnexpectedMessageType),
+            Some(Err(e)) => Err(WebSocketError::WebSocket(e)),
+            None => Err(WebSocketError::ConnectionClosed),
         }
     }
 
-    async fn close(&mut self) -> Result<()> {
-        self.ws
-            .close(None)
-            .await
-            .map_err(|e| Error::transport(format!("WebSocket close error: {}", e)))
+    async fn close(&mut self) -> Result<(), Self::Error> {
+        self.ws.close(None).await?;
+        Ok(())
     }
 }
 

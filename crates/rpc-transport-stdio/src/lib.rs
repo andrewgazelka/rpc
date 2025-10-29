@@ -5,9 +5,17 @@
 //! - CLI tools with RPC capabilities
 //! - Process-to-process communication
 
-use rpc_core::{Error, Message, Result, Transport};
+use rpc_core::{Message, Transport};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::Mutex;
+
+/// Stdio transport error type
+#[derive(Debug, thiserror::Error)]
+pub enum StdioError {
+    /// IO error
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
 
 /// Stdio transport that uses stdin/stdout for communication.
 ///
@@ -36,54 +44,41 @@ impl Default for StdioTransport {
 }
 
 impl Transport for StdioTransport {
-    async fn send(&mut self, msg: Message) -> Result<()> {
+    type Error = StdioError;
+
+    async fn send(&mut self, msg: Message) -> Result<(), Self::Error> {
         let mut stdout = self.stdout.lock().await;
 
         // Write length prefix (4 bytes, big-endian)
         let len = msg.data.len() as u32;
-        stdout
-            .write_all(&len.to_be_bytes())
-            .await
-            .map_err(|e| Error::Transport(format!("Failed to write length: {}", e)))?;
+        stdout.write_all(&len.to_be_bytes()).await?;
 
         // Write message data
-        stdout
-            .write_all(&msg.data)
-            .await
-            .map_err(|e| Error::Transport(format!("Failed to write data: {}", e)))?;
+        stdout.write_all(&msg.data).await?;
 
         // Flush to ensure message is sent immediately
-        stdout
-            .flush()
-            .await
-            .map_err(|e| Error::Transport(format!("Failed to flush: {}", e)))?;
+        stdout.flush().await?;
 
         Ok(())
     }
 
-    async fn recv(&mut self) -> Result<Message> {
+    async fn recv(&mut self) -> Result<Message, Self::Error> {
         let mut stdin = self.stdin.lock().await;
 
         // Read length prefix (4 bytes, big-endian)
         let mut len_buf = [0u8; 4];
-        stdin
-            .read_exact(&mut len_buf)
-            .await
-            .map_err(|e| Error::Transport(format!("Failed to read length: {}", e)))?;
+        stdin.read_exact(&mut len_buf).await?;
 
         let len = u32::from_be_bytes(len_buf) as usize;
 
         // Read message data
         let mut data = vec![0u8; len];
-        stdin
-            .read_exact(&mut data)
-            .await
-            .map_err(|e| Error::Transport(format!("Failed to read data: {}", e)))?;
+        stdin.read_exact(&mut data).await?;
 
         Ok(Message::new(data))
     }
 
-    async fn close(&mut self) -> Result<()> {
+    async fn close(&mut self) -> Result<(), Self::Error> {
         // Stdio doesn't need explicit closing
         Ok(())
     }
@@ -116,44 +111,29 @@ mod tests {
     }
 
     impl Transport for TestTransport {
-        async fn send(&mut self, msg: Message) -> Result<()> {
+        type Error = StdioError;
+
+        async fn send(&mut self, msg: Message) -> Result<(), Self::Error> {
             let mut stream = self.stream.lock().await;
 
             let len = msg.data.len() as u32;
-            stream
-                .write_all(&len.to_be_bytes())
-                .await
-                .map_err(|e| Error::Transport(format!("Failed to write length: {}", e)))?;
-
-            stream
-                .write_all(&msg.data)
-                .await
-                .map_err(|e| Error::Transport(format!("Failed to write data: {}", e)))?;
-
-            stream
-                .flush()
-                .await
-                .map_err(|e| Error::Transport(format!("Failed to flush: {}", e)))?;
+            stream.write_all(&len.to_be_bytes()).await?;
+            stream.write_all(&msg.data).await?;
+            stream.flush().await?;
 
             Ok(())
         }
 
-        async fn recv(&mut self) -> Result<Message> {
+        async fn recv(&mut self) -> Result<Message, Self::Error> {
             let mut stream = self.stream.lock().await;
 
             let mut len_buf = [0u8; 4];
-            stream
-                .read_exact(&mut len_buf)
-                .await
-                .map_err(|e| Error::Transport(format!("Failed to read length: {}", e)))?;
+            stream.read_exact(&mut len_buf).await?;
 
             let len = u32::from_be_bytes(len_buf) as usize;
 
             let mut data = vec![0u8; len];
-            stream
-                .read_exact(&mut data)
-                .await
-                .map_err(|e| Error::Transport(format!("Failed to read data: {}", e)))?;
+            stream.read_exact(&mut data).await?;
 
             Ok(Message::new(data))
         }

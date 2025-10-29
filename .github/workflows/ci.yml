@@ -59,6 +59,26 @@ jobs:
       - name: Run tests
         run: cargo nextest run --all-features --workspace
 
+  minimal:
+    name: Minimal build (no WASM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build rpc-server without default features
+        run: cargo build -p rpc-server --no-default-features
+
+      - name: Verify no wasmtime dependency
+        run: |
+          if cargo tree -p rpc-server --no-default-features | grep -q wasmtime; then
+            echo "ERROR: wasmtime found in dependency tree without features"
+            exit 1
+          fi
+          echo "SUCCESS: wasmtime not included in minimal build"
+
   fmt:
     name: Format
     runs-on: ubuntu-latest

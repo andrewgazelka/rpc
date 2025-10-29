@@ -9,3 +9,4 @@ repository.workspace = true
 [dependencies]
 rpc-core.workspace = true
 tokio.workspace = true
+thiserror.workspace = true

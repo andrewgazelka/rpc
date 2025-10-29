@@ -14,7 +14,21 @@ syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true
 schema.workspace = true
-schema-wit.workspace = true
+schema-wit = { workspace = true, optional = true }
+schema-openapi = { workspace = true, optional = true }
+
+[features]
+default = []
+wit = ["schema-wit"]
+openapi = ["schema-openapi"]
 
 [dev-dependencies]
 rpc-core.workspace = true
+rpc-server = { path = "../rpc-server" }
+rpc-codec-json = { path = "../rpc-codec-json" }
+rpc-transport-inprocess = { path = "../rpc-transport-inprocess" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+schema.workspace = true
+schema-openapi.workspace = true
+tokio = { workspace = true, features = ["full"] }

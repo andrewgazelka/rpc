@@ -3,7 +3,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{ItemForeignMod, ReturnType, parse_macro_input};
-use std::collections::HashMap;
 
 /// Generate RPC client and server traits from a function signature list.
 ///
@@ -26,8 +25,9 @@ pub fn rpc(input: TokenStream) -> TokenStream {
     let foreign_mod = parse_macro_input!(input as ItemForeignMod);
 
     let mut client_methods = Vec::new();
+    let mut dyn_client_trait_methods = Vec::new();
+    let mut dyn_client_impl_methods = Vec::new();
     let mut async_service_methods = Vec::new();
-    let mut request_structs = Vec::new();
     let mut msg_variants = Vec::new();
     let mut intake_match_arms = Vec::new();
     let mut dispatch_arms = Vec::new();
@@ -63,6 +63,24 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 ReturnType::Type(_, ty) => quote! { #ty },
             };
 
+            // Generate trait method (returns Pin<Box<dyn Future>>)
+            dyn_client_trait_methods.push(quote! {
+                fn #method_name(
+                    &self,
+                    #(#param_names: #param_types),*
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = rpc_core::Result<#return_type>> + Send + '_>>;
+            });
+
+            // Generate trait impl method (calls the async method and boxes the future)
+            dyn_client_impl_methods.push(quote! {
+                fn #method_name(
+                    &self,
+                    #(#param_names: #param_types),*
+                ) -> std::pin::Pin<Box<dyn std::future::Future<Output = rpc_core::Result<#return_type>> + Send + '_>> {
+                    Box::pin(self.#method_name(#(#param_names),*))
+                }
+            });
+
             // Generate client method
             client_methods.push(quote! {
                 pub async fn #method_name(&self, #(#param_names: #param_types),*) -> rpc_core::Result<#return_type> {
@@ -75,8 +93,8 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     let msg_data = self.codec.encode(&request)?;
                     let msg = rpc_core::Message::new(msg_data);
 
-                    self.transport.lock().await.send(msg).await?;
-                    let response_msg = self.transport.lock().await.recv().await?;
+                    self.transport.lock().await.send(msg).await.map_err(rpc_core::Error::transport)?;
+                    let response_msg = self.transport.lock().await.recv().await.map_err(rpc_core::Error::transport)?;
                     let response: rpc_core::RpcResponse = self.codec.decode(&response_msg.data)?;
 
                     match response.result {
@@ -97,30 +115,23 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 }
             });
 
-            // Generate request struct
-            let request_struct_name = quote::format_ident!("{}Request",
-                method_name.to_string().chars().next().unwrap().to_uppercase().to_string()
-                + &method_name.to_string()[1..]);
-
-            request_structs.push(quote! {
-                #[derive(Debug, Clone)]
-                pub struct #request_struct_name {
-                    #(pub #param_names: #param_types),*
-                }
-            });
-
             // Generate Msg enum variant
+            // Use tuple for params: single param = (T,), multiple = (T1, T2, ...), zero = ()
+            let msg_param_type = quote! { (#(#param_types,)*) };
+
             msg_variants.push(quote! {
-                #method_name(#request_struct_name, tokio::sync::oneshot::Sender<#return_type>)
+                #method_name(#msg_param_type, tokio::sync::oneshot::Sender<#return_type>)
             });
 
             // Generate intake match arm for blanket impl
-            let field_accesses: Vec<_> = param_names.iter().map(|name| {
-                quote! { req.#name }
+            // Unpack tuple into individual parameters
+            let indices: Vec<_> = (0..params.len()).map(syn::Index::from).collect();
+            let field_accesses: Vec<_> = indices.iter().map(|idx| {
+                quote! { params.#idx }
             }).collect();
 
             intake_match_arms.push(quote! {
-                Msg::#method_name(req, tx) => {
+                Msg::#method_name(params, tx) => {
                     let result = self.#method_name(#(#field_accesses),*).await;
                     let _ = tx.send(result);
                 }
@@ -141,8 +152,9 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 }
             });
 
-            // Generate schema entry
+            // Generate schema entry (only when openapi feature is enabled)
             schema_entries.push(quote! {
+                #[cfg(feature = "openapi")]
                 {
                     use ::schema::Schema;
                     schema_map.insert(
@@ -162,14 +174,15 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 }
             });
 
-            // Generate WIT method signature
+            // Generate WIT method signature (only when wit feature is enabled)
             // Convert param names to strings for WIT generation
-            let param_name_strs: Vec<_> = param_names.iter().map(|p| {
+            let _param_name_strs: Vec<_> = param_names.iter().map(|p| {
                 // Extract identifier from pattern
                 quote! { stringify!(#p) }.to_string()
             }).collect();
 
             wit_methods.push(quote! {
+                #[cfg(feature = "wit")]
                 {
                     use ::schema::Schema;
                     use ::schema_wit::schema_type_to_wit;
@@ -238,18 +251,12 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 ReturnType::Type(_, ty) => quote! { #ty },
             };
 
-            let request_struct_name = quote::format_ident!("{}Request",
-                method_name.to_string().chars().next().unwrap().to_uppercase().to_string()
-                + &method_name.to_string()[1..]);
-
+            // Decode params as tuple and pass to Msg enum
             final_dispatch_arms.push(quote! {
                 #method_str => {
                     let params: (#(#param_types,)*) = codec.decode(&request.params)?;
                     let (tx, rx) = tokio::sync::oneshot::channel();
-                    let req = #request_struct_name {
-                        #(#param_names: params.#indices),*
-                    };
-                    server.intake(Msg::#method_name(req, tx)).await;
+                    server.intake(Msg::#method_name(params, tx)).await;
                     let result = rx.await.map_err(|_| rpc_core::Error::other("Service dropped response channel"))?;
                     let result_data = codec.encode(&result)?;
                     rpc_core::ResponseResult::Ok(result_data)
@@ -260,6 +267,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         /// Schema information for a single RPC method
+        #[cfg(feature = "openapi")]
         #[derive(Debug, Clone)]
         pub struct MethodSchema {
             pub name: String,
@@ -268,12 +276,17 @@ pub fn rpc(input: TokenStream) -> TokenStream {
         }
 
         pub mod client {
+            use super::*;
             use rpc_core::{Transport, Codec, Message, RpcRequest, RpcResponse, ResponseResult};
             use std::sync::Arc;
             use tokio::sync::Mutex;
             use std::sync::atomic::{AtomicU64, Ordering};
             use std::collections::HashMap;
-            use super::MethodSchema;
+
+            /// Dynamic client trait for type erasure
+            pub trait DynClient: Send + Sync {
+                #(#dyn_client_trait_methods)*
+            }
 
             pub struct Client<T, C>
             where
@@ -299,6 +312,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 }
 
                 /// Get schema information for all RPC methods
+                #[cfg(feature = "openapi")]
                 pub fn schema() -> HashMap<String, MethodSchema> {
                     let mut schema_map = HashMap::new();
                     #(#schema_entries)*
@@ -306,6 +320,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 }
 
                 /// Generate WIT (WebAssembly Interface Type) definition for this RPC interface
+                #[cfg(feature = "wit")]
                 pub fn wit_schema(interface_name: &str) -> String {
                     let mut wit_output = String::new();
                     wit_output.push_str(&format!("interface {} {{\n", interface_name));
@@ -316,16 +331,23 @@ pub fn rpc(input: TokenStream) -> TokenStream {
 
                 #(#client_methods)*
             }
+
+            impl<T, C> DynClient for Client<T, C>
+            where
+                T: Transport + 'static,
+                C: Codec + 'static,
+            {
+                #(#dyn_client_impl_methods)*
+            }
         }
 
         pub mod server {
+            use super::*;
             use rpc_core::{Transport, Codec, Message, RpcRequest, RpcResponse, ResponseResult};
-
-            // Request structs
-            #(#request_structs)*
 
             // Message enum
             #[derive(Debug)]
+            #[allow(non_camel_case_types)]
             pub enum Msg {
                 #(#msg_variants),*
             }
@@ -360,7 +382,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                 C: Codec + 'static,
             {
                 loop {
-                    let msg = transport.recv().await?;
+                    let msg = transport.recv().await.map_err(rpc_core::Error::transport)?;
                     let request: RpcRequest = codec.decode(&msg.data)?;
 
                     let result = match request.method.as_str() {
@@ -379,7 +401,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
 
                     let response_data = codec.encode(&response)?;
                     let response_msg = Message::new(response_data);
-                    transport.send(response_msg).await?;
+                    transport.send(response_msg).await.map_err(rpc_core::Error::transport)?;
                 }
             }
         }

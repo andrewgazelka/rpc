@@ -9,17 +9,24 @@ publish = false
 
 [dependencies]
 rpc-core.workspace = true
-rpc-server.workspace = true
+rpc-server = { workspace = true, features = ["openapi", "wit"] }
 rpc-codec-json.workspace = true
 rpc-codec-msgpack.workspace = true
 rpc-transport-ws.workspace = true
 rpc-transport-stdio.workspace = true
 rpc-transport-inprocess.workspace = true
+rpc-transport-http.workspace = true
 rpc-openapi.workspace = true
-rpc-wasm-runtime.workspace = true
+rpc-wasm-runtime = { workspace = true, optional = true }
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 schema.workspace = true
-schema-openapi.workspace = true
-schema-wit.workspace = true
+schema-openapi = { workspace = true, optional = true }
+schema-wit = { workspace = true, optional = true }
+
+[features]
+default = []
+wit = ["rpc-server/wit", "schema-wit"]
+wasm = ["rpc-wasm-runtime", "wit"]
+openapi = ["rpc-server/openapi", "schema-openapi"]

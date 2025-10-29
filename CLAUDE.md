@@ -253,7 +253,6 @@ Uses [cargo-nextest](https://nexte.st/) for faster, cleaner test output.
 - Match responses via request ID
 
 ### More Transports
-- `rpc-transport-http`: HTTP/REST transport
 - `rpc-transport-tcp`: Raw TCP transport
 - `rpc-transport-ipc`: Unix domain sockets
 
@@ -327,6 +326,53 @@ rpc-core
 - **jsonrpc**: JSON-specific, can't swap codecs
 
 This framework prioritizes **modularity and pluggability** over feature completeness.
+
+## Authentication and Authorization
+
+Authentication is intentionally NOT handled at the transport layer. Instead, it belongs at the application layer in your RPC service implementations.
+
+### Approach 1: Per-Method Auth
+
+Check authentication in each RPC method:
+
+```rust
+struct MyService {
+    auth: AuthService,
+}
+
+impl server::AsyncService for MyService {
+    async fn sensitive_operation(&mut self, token: String, data: Data) -> Result<Response> {
+        self.auth.verify_token(&token)?;
+        // Process request
+    }
+}
+```
+
+### Approach 2: Wrapper Service
+
+Create a generic auth wrapper:
+
+```rust
+struct AuthenticatedService<S> {
+    inner: S,
+    required_token: String,
+}
+
+impl<S: server::AsyncService> server::AsyncService for AuthenticatedService<S> {
+    async fn method(&mut self, token: String, args...) -> Result<Response> {
+        if token != self.required_token {
+            return Err("unauthorized");
+        }
+        self.inner.method(args...).await
+    }
+}
+```
+
+### Approach 3: Custom Extractors (HTTP Only)
+
+For HTTP transport, leverage Axum extractors. Users wanting middleware-style auth can create custom extractors that implement `FromRequestParts`, similar to how Axum's JWT example works. The transport layer stays simple - auth logic lives in application handlers.
+
+The transport layer focuses on reliable message delivery. Authorization policy is an application concern that varies by use case.
 
 ## License
 

@@ -7,8 +7,16 @@
 //! - Plugin architectures where plugins communicate via RPC
 //! - Hot-reloadable dynamic libraries
 
-use rpc_core::{Error, Message, Result, Transport};
+use rpc_core::{Message, Transport};
 use tokio::sync::mpsc;
+
+/// In-process transport error type
+#[derive(Debug, thiserror::Error)]
+pub enum InProcessError {
+    /// Channel closed
+    #[error("channel closed")]
+    ChannelClosed,
+}
 
 /// In-process transport using tokio channels.
 ///
@@ -54,21 +62,23 @@ impl InProcessTransport {
 }
 
 impl Transport for InProcessTransport {
-    async fn send(&mut self, msg: Message) -> Result<()> {
+    type Error = InProcessError;
+
+    async fn send(&mut self, msg: Message) -> Result<(), Self::Error> {
         self.sender
             .send(msg)
-            .map_err(|_| Error::Transport("Channel closed".to_string()))?;
+            .map_err(|_| InProcessError::ChannelClosed)?;
         Ok(())
     }
 
-    async fn recv(&mut self) -> Result<Message> {
+    async fn recv(&mut self) -> Result<Message, Self::Error> {
         self.receiver
             .recv()
             .await
-            .ok_or_else(|| Error::Transport("Channel closed".to_string()))
+            .ok_or(InProcessError::ChannelClosed)
     }
 
-    async fn close(&mut self) -> Result<()> {
+    async fn close(&mut self) -> Result<(), Self::Error> {
         self.receiver.close();
         Ok(())
     }
