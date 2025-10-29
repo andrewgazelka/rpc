@@ -12,6 +12,8 @@ rpc-core.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 tokio.workspace = true
+blake3.workspace = true
+lru.workspace = true
 
 # Wasmtime dependencies
 wasmtime = { version = "28.0", features = ["component-model", "async"] }

@@ -28,6 +28,34 @@ runtime.execute(kernel_bytes, transport, codec).await?;
 
 WASM kernel: 14KB, sandboxed via wasmtime.
 
+## Kernel caching
+
+Servers cache WASM binaries by Blake3 hash to avoid re-uploading:
+
+```rust
+use rpc_wasm_runtime::{WasmRuntime, Blake3Hash};
+
+// Client computes hash
+let hash = Blake3Hash::hash(&wasm_bytes);
+
+// Try to execute (may fail if not cached)
+match runtime.execute_by_hash(hash, transport, codec, None).await {
+    Ok(result) => result,
+    Err(Error::KernelNotFound(_)) => {
+        // Store binary first, then retry
+        runtime.store_kernel(hash, wasm_bytes)?;
+        runtime.execute_by_hash(hash, transport, codec, None).await?
+    }
+    Err(e) => return Err(e),
+}
+```
+
+Cache behavior:
+- LRU cache holds 100 binaries by default (configurable)
+- Hash verification prevents tampering
+- Frequently used kernels stay hot
+- Reduces network overhead for repeated executions
+
 ## CPU time limiting
 
 Servers enforce maximum kernel execution time using epoch-based interruption:
@@ -40,11 +68,11 @@ use rpc_wasm_runtime::WasmRuntime;
 let mut runtime = WasmRuntime::new(Duration::from_secs(5))?;
 
 // Client can request shorter timeout, but not longer than server maximum
-runtime.execute(kernel_bytes, transport, codec, Some(Duration::from_millis(500))).await?;
+runtime.execute_by_hash(hash, transport, codec, Some(Duration::from_millis(500))).await?;
 
 // Server maximum is enforced if client requests longer or no timeout
-runtime.execute(kernel_bytes, transport, codec, Some(Duration::from_secs(10))).await?;  // Capped at 5s
-runtime.execute(kernel_bytes, transport, codec, None).await?;  // Uses 5s default
+runtime.execute_by_hash(hash, transport, codec, Some(Duration::from_secs(10))).await?;  // Capped at 5s
+runtime.execute_by_hash(hash, transport, codec, None).await?;  // Uses 5s default
 ```
 
 Timeout behavior:
