@@ -10,6 +10,12 @@ use std::fmt;
 pub mod error;
 pub use error::{Error, Result};
 
+/// Re-export tracing for use by macro-generated code.
+///
+/// This is not part of the public API and should only be used by the `rpc!` macro.
+#[doc(hidden)]
+pub use tracing;
+
 /// Opaque message container for transport layer.
 ///
 /// The message contains raw bytes that will be interpreted by the codec layer.

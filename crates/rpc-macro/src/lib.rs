@@ -84,10 +84,10 @@ pub fn rpc(input: TokenStream) -> TokenStream {
             // Generate client method
             client_methods.push(quote! {
                 pub async fn #method_name(&self, #(#param_names: #param_types),*) -> rpc_core::Result<#return_type> {
-                    let span = tracing::debug_span!(
+                    let span = rpc_core::tracing::debug_span!(
                         "rpc_client_call",
                         method = #method_str,
-                        request_id = tracing::field::Empty
+                        request_id = rpc_core::tracing::field::Empty
                     );
 
                     let params = self.codec.encode(&(#(#param_names,)*))?;
@@ -101,14 +101,14 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                         params,
                     };
 
-                    tracing::debug!(parent: &span, "sending request");
+                    rpc_core::tracing::debug!(parent: &span, "sending request");
 
                     let msg_data = self.codec.encode(&request)?;
                     let msg = rpc_core::Message::new(msg_data);
 
                     self.transport.lock().await.send(msg).await.map_err(rpc_core::Error::transport)?;
 
-                    tracing::debug!(parent: &span, "awaiting response");
+                    rpc_core::tracing::debug!(parent: &span, "awaiting response");
 
                     let response_msg = self.transport.lock().await.recv().await.map_err(rpc_core::Error::transport)?;
                     let response: rpc_core::RpcResponse = self.codec.decode(&response_msg.data)?;
@@ -116,19 +116,19 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     match response.result {
                         rpc_core::ResponseResult::Ok(data) => {
                             let result = self.codec.decode(&data)?;
-                            tracing::debug!(parent: &span, ?result, "call succeeded");
+                            rpc_core::tracing::debug!(parent: &span, ?result, "call succeeded");
                             Ok(result)
                         }
                         rpc_core::ResponseResult::Err(e) => {
-                            tracing::warn!(parent: &span, error = %e, "call failed");
+                            rpc_core::tracing::warn!(parent: &span, error = %e, "call failed");
                             Err(rpc_core::Error::remote(e))
                         }
                         rpc_core::ResponseResult::StreamChunk(_) => {
-                            tracing::error!(parent: &span, "unexpected stream chunk in non-streaming call");
+                            rpc_core::tracing::error!(parent: &span, "unexpected stream chunk in non-streaming call");
                             Err(rpc_core::Error::other("unexpected stream chunk in non-streaming call"))
                         }
                         rpc_core::ResponseResult::StreamEnd => {
-                            tracing::error!(parent: &span, "unexpected stream end in non-streaming call");
+                            rpc_core::tracing::error!(parent: &span, "unexpected stream end in non-streaming call");
                             Err(rpc_core::Error::other("unexpected stream end in non-streaming call"))
                         }
                     }
@@ -473,18 +473,18 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     let msg = transport.recv().await.map_err(rpc_core::Error::transport)?;
                     let request: RpcRequest = codec.decode(&msg.data)?;
 
-                    let span = tracing::debug_span!(
+                    let span = rpc_core::tracing::debug_span!(
                         "rpc_server_dispatch",
                         method = %request.method,
                         request_id = request.id
                     );
 
-                    tracing::debug!(parent: &span, "received request");
+                    rpc_core::tracing::debug!(parent: &span, "received request");
 
                     let result = match request.method.as_str() {
                         #(#final_dispatch_arms)*
                         method => {
-                            tracing::warn!(parent: &span, method = %method, "method not found");
+                            rpc_core::tracing::warn!(parent: &span, method = %method, "method not found");
                             rpc_core::ResponseResult::Err(
                                 format!("method not found: {}", method)
                             )
@@ -492,10 +492,10 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     };
 
                     match &result {
-                        rpc_core::ResponseResult::Ok(_) => tracing::debug!(parent: &span, "method call succeeded"),
-                        rpc_core::ResponseResult::Err(e) => tracing::warn!(parent: &span, error = %e, "method call failed"),
-                        rpc_core::ResponseResult::StreamChunk(_) => tracing::debug!(parent: &span, "sent stream chunk"),
-                        rpc_core::ResponseResult::StreamEnd => tracing::debug!(parent: &span, "stream ended"),
+                        rpc_core::ResponseResult::Ok(_) => rpc_core::tracing::debug!(parent: &span, "method call succeeded"),
+                        rpc_core::ResponseResult::Err(e) => rpc_core::tracing::warn!(parent: &span, error = %e, "method call failed"),
+                        rpc_core::ResponseResult::StreamChunk(_) => rpc_core::tracing::debug!(parent: &span, "sent stream chunk"),
+                        rpc_core::ResponseResult::StreamEnd => rpc_core::tracing::debug!(parent: &span, "stream ended"),
                     }
 
                     let response = RpcResponse {
@@ -507,7 +507,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     let response_msg = Message::new(response_data);
                     transport.send(response_msg).await.map_err(rpc_core::Error::transport)?;
 
-                    tracing::debug!(parent: &span, "sent response");
+                    rpc_core::tracing::debug!(parent: &span, "sent response");
                 }
             }
         }
