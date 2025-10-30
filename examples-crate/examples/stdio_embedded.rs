@@ -21,17 +21,17 @@ rpc! {
 struct DataProcessor;
 
 impl server::AsyncService for DataProcessor {
-    async fn process_data(&mut self, data: Vec<u8>) -> Vec<u8> {
+    async fn process_data(&self, data: Vec<u8>) -> Vec<u8> {
         // Simple transformation: reverse the bytes
         data.into_iter().rev().collect()
     }
 
-    async fn transform(&mut self, text: String) -> String {
+    async fn transform(&self, text: String) -> String {
         // Transform: uppercase and reverse
         text.to_uppercase().chars().rev().collect()
     }
 
-    async fn calculate(&mut self, x: f64, y: f64, op: String) -> f64 {
+    async fn calculate(&self, x: f64, y: f64, op: String) -> f64 {
         match op.as_str() {
             "add" => x + y,
             "sub" => x - y,

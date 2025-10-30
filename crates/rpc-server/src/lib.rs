@@ -23,15 +23,15 @@ mod tests {
     struct MyService;
 
     impl server::AsyncService for MyService {
-        async fn add(&mut self, a: i32, b: i32) -> i32 {
+        async fn add(&self, a: i32, b: i32) -> i32 {
             a + b
         }
 
-        async fn greet(&mut self, name: String) -> String {
+        async fn greet(&self, name: String) -> String {
             format!("Hello, {}!", name)
         }
 
-        async fn multiply(&mut self, x: f64, y: f64) -> f64 {
+        async fn multiply(&self, x: f64, y: f64) -> f64 {
             x * y
         }
     }

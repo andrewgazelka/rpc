@@ -162,7 +162,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
 
             // Generate AsyncService trait method
             async_service_methods.push(quote! {
-                async fn #method_name(&mut self, #(#param_names: #param_types),*) -> #return_type;
+                async fn #method_name(&self, #(#param_names: #param_types),*) -> #return_type;
             });
 
             // Generate dispatch arm (now uses Service::intake)
@@ -441,18 +441,18 @@ pub fn rpc(input: TokenStream) -> TokenStream {
             }
 
             // Low-level Service trait (message-passing)
-            pub trait Service: Send {
-                async fn intake(&mut self, msg: Msg);
+            pub trait Service: Send + Sync {
+                async fn intake(&self, msg: Msg);
             }
 
             // High-level AsyncService trait (ergonomic async methods)
-            pub trait AsyncService: Send {
+            pub trait AsyncService: Send + Sync {
                 #(#async_service_methods)*
             }
 
             // Blanket impl: any AsyncService can be used as a Service
             impl<T: AsyncService> Service for T {
-                async fn intake(&mut self, msg: Msg) {
+                async fn intake(&self, msg: Msg) {
                     match msg {
                         #(#intake_match_arms)*
                     }
@@ -460,7 +460,7 @@ pub fn rpc(input: TokenStream) -> TokenStream {
             }
 
             pub async fn serve<S, T, C>(
-                mut server: S,
+                server: S,
                 mut transport: T,
                 codec: C,
             ) -> rpc_core::Result<()>

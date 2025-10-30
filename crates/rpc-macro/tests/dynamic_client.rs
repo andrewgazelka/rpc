@@ -20,14 +20,14 @@ rpc! {
 struct TestService;
 
 impl server::AsyncService for TestService {
-    async fn get_data(&mut self, index: u32) -> DataChunk {
+    async fn get_data(&self, index: u32) -> DataChunk {
         DataChunk {
             index,
             data: vec![index as u8; 10],
         }
     }
 
-    async fn echo(&mut self, msg: String) -> String {
+    async fn echo(&self, msg: String) -> String {
         msg
     }
 }

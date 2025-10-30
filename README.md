@@ -15,79 +15,144 @@ for friend_id in user.friends {
 }
 
 // With kernel: 1 round-trip
-wit_bindgen::generate!({ world: "social-kernel" });
+// Load pre-compiled kernel (compiled separately to wasm32-wasip2)
+let kernel_bytes = std::fs::read("friends_of_friends.wasm")?;
 
-impl Guest for Kernel {
+// Client sends kernel to server via execute_kernel RPC method
+let friends_of_friends: HashSet<UserId> = client.execute_kernel(kernel_bytes).await?;
+```
+
+WASM kernel: 14KB, sandboxed via wasmtime. For a user with 50 friends, reduces 50 round-trips to 1. Client sends compiled WASM to server via RPC, server executes it and returns the result.
+
+## Writing a kernel
+
+Kernels are separate Rust crates compiled to `wasm32-wasip2`:
+
+```toml
+# kernel/Cargo.toml
+[package]
+name = "friends-kernel"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]  # Compile as WebAssembly component
+
+[dependencies]
+wit-bindgen = "0.33"
+
+[profile.release]
+opt-level = "z"      # Optimize for size
+lto = true           # Link-time optimization
+codegen-units = 1
+strip = true
+panic = "abort"
+```
+
+```rust
+// kernel/src/lib.rs
+wit_bindgen::generate!({
+    world: "social-kernel",
+    path: "../social.wit",  // Generated from your rpc! definition
+});
+
+use exports::rpc::kernel::kernel::Guest;
+
+struct FriendsKernel;
+
+impl Guest for FriendsKernel {
     fn run(id: UserId) -> HashSet<UserId> {
-        let user = social::get_user(id);
+        let user = rpc::kernel::social::get_user(id);
         user.friends
             .into_iter()
-            .flat_map(|fid| social::get_user(fid).friends)
+            .flat_map(|fid| rpc::kernel::social::get_user(fid).friends)
             .collect()
     }
 }
 
-runtime.execute(kernel_bytes, transport, codec).await?;
+export!(FriendsKernel);
 ```
 
-WASM kernel: 14KB, sandboxed via wasmtime. For a user with 50 friends, reduces 50 round-trips to 1.
+Compile and embed in your client:
+
+```bash
+cd kernel
+cargo build --release --target wasm32-wasip2
+```
+
+```rust
+// In your client code
+const KERNEL: &[u8] = include_bytes!("../kernel/target/wasm32-wasip2/release/friends_kernel.wasm");
+
+let friends_of_friends: HashSet<UserId> = client.execute_kernel(KERNEL).await?;
+```
+
+### Inline kernel compilation (experimental)
+
+For a more succinct workflow, you can use `include-wasm-rs` to compile kernels at build time without a separate crate:
+
+```toml
+[build-dependencies]
+include-wasm-rs = "1.0"
+```
+
+```rust
+// build.rs
+fn main() {
+    include_wasm::build_wasm("./kernels/friends.rs", "wasm32-wasip2");
+}
+
+// In your client code
+const KERNEL: &[u8] = include_wasm!("friends");
+
+let friends_of_friends: HashSet<UserId> = client.execute_kernel(KERNEL).await?;
+```
+
+This compiles the kernel as part of your main crate's build process, eliminating the need for a separate kernel crate.
 
 ## Kernel caching
 
-Servers cache WASM binaries by Blake3 hash to avoid re-uploading:
+Servers cache WASM binaries to avoid re-uploading. The client library handles this automatically:
 
 ```rust
-use rpc_wasm_runtime::{WasmRuntime, Blake3Hash};
+// First time: client sends full WASM binary (~14KB)
+let result1 = client.execute_kernel(&kernel_bytes).await?;
 
-// Client computes hash
-let hash = Blake3Hash::hash(&wasm_bytes);
-
-// Try to execute (may fail if not cached)
-match runtime.execute_by_hash(hash, transport, codec, None).await {
-    Ok(result) => result,
-    Err(Error::KernelNotFound(_)) => {
-        // Store binary first, then retry
-        runtime.store_kernel(hash, wasm_bytes)?;
-        runtime.execute_by_hash(hash, transport, codec, None).await?
-    }
-    Err(e) => return Err(e),
-}
+// Subsequent calls: client only sends hash (~32 bytes)
+let result2 = client.execute_kernel(&kernel_bytes).await?;
+let result3 = client.execute_kernel(&kernel_bytes).await?;
 ```
 
+The client computes a Blake3 hash of the kernel and tries hash-only execution first. If the server doesn't have it cached, the client automatically uploads the full binary.
+
 Cache behavior:
-- LRU cache holds 100 binaries by default (configurable)
+- Server holds 100 binaries by default (configurable via LRU cache)
 - Hash verification prevents tampering
 - Frequently used kernels stay hot
-- Reduces network overhead for repeated executions
+- Client transparently handles cache misses
 
 Network cost:
-- First execution: 32 bytes (hash) + 14KB (binary on cache miss) = ~14KB
-- Subsequent executions: 32 bytes (hash only)
+- First execution: ~14KB (full binary)
+- Subsequent executions: ~32 bytes (hash only)
 - After 2 executions: amortized 7KB per call
 - After 10 executions: amortized 1.4KB per call
 - After 100 executions: amortized 140 bytes per call
 
 ## CPU time limiting
 
-Servers enforce maximum kernel execution time using epoch-based interruption:
+Clients can optionally request execution timeouts:
 
 ```rust
 use std::time::Duration;
-use rpc_wasm_runtime::WasmRuntime;
 
-// Server creates runtime with maximum 5 second timeout (enforced server-side)
-let mut runtime = WasmRuntime::new(Duration::from_secs(5))?;
+// Client requests a 500ms timeout
+let result = client.execute_kernel_with_timeout(kernel_bytes, Duration::from_millis(500)).await?;
 
-// Client can request shorter timeout, but not longer than server maximum
-runtime.execute_by_hash(hash, transport, codec, Some(Duration::from_millis(500))).await?;
-
-// Server maximum is enforced if client requests longer or no timeout
-runtime.execute_by_hash(hash, transport, codec, Some(Duration::from_secs(10))).await?;  // Capped at 5s
-runtime.execute_by_hash(hash, transport, codec, None).await?;  // Uses 5s default
+// Client requests 10 second timeout (server may cap this to its configured maximum)
+let result = client.execute_kernel_with_timeout(kernel_bytes, Duration::from_secs(10)).await?;
 ```
 
 Timeout behavior:
-- Server sets `max_timeout` when creating `WasmRuntime`
+- Server sets `max_timeout` when creating its `WasmRuntime` (e.g., 5 seconds)
 - Actual timeout: `min(client_requested, server_max)`
 - Prevents malicious clients from monopolizing resources
 - Epoch interruption has approximately 10% overhead (vs 2-3x for fuel-based limiting)
@@ -172,7 +237,7 @@ rpc! {
 // Server
 struct Service;
 impl server::AsyncService for Service {
-    async fn add(&mut self, a: i32, b: i32) -> i32 { a + b }
+    async fn add(&self, a: i32, b: i32) -> i32 { a + b }
 }
 
 server::serve(Service, WebSocketTransport::bind("127.0.0.1:8080").await?, JsonCodec).await?;
@@ -192,6 +257,45 @@ server::serve(service, WebSocketTransport, JsonCodec).await?;
 server::serve(service, WebSocketTransport, MessagePackCodec).await?;
 server::serve(service, StdioTransport, JsonCodec).await?;
 ```
+
+## Stateful services
+
+Services use `&self` (not `&mut self`), enabling parallel request handling. For mutable state, use interior mutability:
+
+```rust
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+rpc! {
+    extern "Rust" {
+        fn increment() -> u64;
+        fn get_count() -> u64;
+    }
+}
+
+struct Counter {
+    count: Arc<Mutex<u64>>,
+}
+
+impl server::AsyncService for Counter {
+    async fn increment(&self) -> u64 {
+        let mut count = self.count.lock().await;
+        *count += 1;
+        *count
+    }
+
+    async fn get_count(&self) -> u64 {
+        *self.count.lock().await
+    }
+}
+
+let service = Counter {
+    count: Arc::new(Mutex::new(0)),
+};
+server::serve(service, transport, codec).await?;
+```
+
+This pattern (similar to Axum) allows you to control locking granularity and enables concurrent request processing.
 
 ## Auto-generated output
 

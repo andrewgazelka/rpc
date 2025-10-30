@@ -23,13 +23,13 @@ struct CounterService {
 }
 
 impl server::AsyncService for CounterService {
-    async fn increment(&mut self, value: u32) -> u32 {
+    async fn increment(&self, value: u32) -> u32 {
         let new_value = value + 1;
         *self.value.lock().await = new_value;
         new_value
     }
 
-    async fn get_value(&mut self) -> u32 {
+    async fn get_value(&self) -> u32 {
         *self.value.lock().await
     }
 }

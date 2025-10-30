@@ -26,12 +26,12 @@ rpc! {
 struct EchoServer;
 
 impl server::AsyncService for EchoServer {
-    async fn echo(&mut self, message: String) -> String {
+    async fn echo(&self, message: String) -> String {
         println!("[Server] Received echo request: {}", message);
         format!("Server echo: {}", message)
     }
 
-    async fn add(&mut self, a: i32, b: i32) -> i32 {
+    async fn add(&self, a: i32, b: i32) -> i32 {
         println!("[Server] Received add request: {} + {}", a, b);
         let result = a + b;
         println!("[Server] Returning result: {}", result);

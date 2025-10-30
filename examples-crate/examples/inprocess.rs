@@ -20,12 +20,12 @@ rpc! {
 struct MathService;
 
 impl server::AsyncService for MathService {
-    async fn factorial(&mut self, n: u64) -> u64 {
+    async fn factorial(&self, n: u64) -> u64 {
         println!("[Server] Computing factorial({})", n);
         (1..=n).product()
     }
 
-    async fn fibonacci(&mut self, n: u64) -> u64 {
+    async fn fibonacci(&self, n: u64) -> u64 {
         println!("[Server] Computing fibonacci({})", n);
         if n <= 1 {
             n
@@ -41,7 +41,7 @@ impl server::AsyncService for MathService {
         }
     }
 
-    async fn is_prime(&mut self, n: u64) -> bool {
+    async fn is_prime(&self, n: u64) -> bool {
         println!("[Server] Checking if {} is prime", n);
         if n < 2 {
             return false;

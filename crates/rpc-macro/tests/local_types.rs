@@ -28,14 +28,14 @@ rpc! {
 struct UserService;
 
 impl server::AsyncService for UserService {
-    async fn create_user(&mut self, req: CreateUserRequest) -> User {
+    async fn create_user(&self, req: CreateUserRequest) -> User {
         User {
             id: 1,
             name: req.name,
         }
     }
 
-    async fn get_user(&mut self, id: u64) -> Option<User> {
+    async fn get_user(&self, id: u64) -> Option<User> {
         if id == 1 {
             Some(User {
                 id: 1,

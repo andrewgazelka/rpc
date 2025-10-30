@@ -25,20 +25,20 @@ struct StreamingService {
 }
 
 impl server::AsyncService for StreamingService {
-    async fn start_stream(&mut self, size: u64) -> u64 {
+    async fn start_stream(&self, size: u64) -> u64 {
         println!("[Server] Starting stream of {} bytes", size);
         // In a real implementation, this would create a stream handle
         // For demo, we just return a stream ID
         1
     }
 
-    async fn get_total_chunks(&mut self, stream_id: u64) -> u64 {
+    async fn get_total_chunks(&self, stream_id: u64) -> u64 {
         println!("[Server] Getting total chunks for stream {}", stream_id);
         // Simulate 10 chunks for this demo
         10
     }
 
-    async fn get_chunk(&mut self, stream_id: u64, chunk_index: u64) -> Option<Vec<u8>> {
+    async fn get_chunk(&self, stream_id: u64, chunk_index: u64) -> Option<Vec<u8>> {
         println!(
             "[Server] Sending chunk {} of stream {}",
             chunk_index, stream_id

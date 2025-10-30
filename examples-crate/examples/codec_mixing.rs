@@ -22,13 +22,13 @@ rpc! {
 struct DataService;
 
 impl server::AsyncService for DataService {
-    async fn compress(&mut self, data: Vec<u8>) -> Vec<u8> {
+    async fn compress(&self, data: Vec<u8>) -> Vec<u8> {
         println!("[Server] Compressing {} bytes", data.len());
         // Simple run-length encoding simulation
         data.into_iter().filter(|&b| b != 0).collect()
     }
 
-    async fn analyze(&mut self, text: String) -> Analysis {
+    async fn analyze(&self, text: String) -> Analysis {
         println!("[Server] Analyzing text: '{}'", text);
         Analysis {
             length: text.len(),
