@@ -1,8 +1,181 @@
 # rpc
 
-RPC framework with server-side WASM composition. Write Rust once, get WIT/OpenAPI/TypeScript clients.
+Modular RPC framework for Rust. Write once, generate WIT/OpenAPI/TypeScript clients. Swap transports and codecs.
 
-## Server-side composition
+## Table of Contents
+
+- [Features](#features)
+- [Basic Usage](#basic-usage)
+- [Stateful Services](#stateful-services)
+- [Transport and Codec Flexibility](#transport-and-codec-flexibility)
+- [Auto-generated Output](#auto-generated-output)
+- [Install](#install)
+- [Examples](#examples)
+- [Packages](#packages)
+- [Comparison](#comparison)
+- [Experimental: Server-side WASM Composition](#experimental-server-side-wasm-composition)
+  - [Overview](#overview)
+  - [Writing a Kernel](#writing-a-kernel)
+  - [Inline Kernel Compilation (Experimental)](#inline-kernel-compilation-experimental)
+  - [Kernel Caching](#kernel-caching)
+  - [CPU Time Limiting](#cpu-time-limiting)
+  - [Example: Data Aggregation](#example-data-aggregation)
+  - [Example: Conditional Logic](#example-conditional-logic)
+  - [How WIT Generation Works](#how-wit-generation-works)
+- [License](#license)
+
+## Features
+
+- Define RPC interfaces in Rust using `rpc!` macro
+- Swap transports: WebSocket, stdio, or custom
+- Swap codecs: JSON, MessagePack, or custom
+- Generate OpenAPI specs and TypeScript clients
+- Generate WIT definitions for WASM interop
+- Built-in tracing support for all client/server calls
+
+## Basic Usage
+
+```rust
+rpc! {
+    extern "Rust" {
+        fn add(a: i32, b: i32) -> i32;
+    }
+}
+
+// Server
+struct Service;
+impl server::AsyncService for Service {
+    async fn add(&self, a: i32, b: i32) -> i32 { a + b }
+}
+
+server::serve(Service, WebSocketTransport::bind("127.0.0.1:8080").await?, JsonCodec).await?;
+
+// Client
+let client = client::Client::new(
+    WebSocketTransport::connect("ws://127.0.0.1:8080").await?,
+    JsonCodec
+);
+let result = client.add(2, 3).await?;  // 5
+```
+
+## Stateful Services
+
+Services use `&self` (not `&mut self`), enabling parallel request handling. For mutable state, use interior mutability:
+
+```rust
+use std::sync::atomic::{AtomicU64, Ordering};
+
+rpc! {
+    extern "Rust" {
+        fn increment() -> u64;
+        fn get_count() -> u64;
+    }
+}
+
+struct Counter {
+    count: AtomicU64,
+}
+
+impl server::AsyncService for Counter {
+    async fn increment(&self) -> u64 {
+        self.count.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    async fn get_count(&self) -> u64 {
+        self.count.load(Ordering::SeqCst)
+    }
+}
+
+let service = Counter {
+    count: AtomicU64::new(0),
+};
+server::serve(service, transport, codec).await?;
+```
+
+This pattern (similar to Axum) allows you to control locking granularity and enables concurrent request processing.
+
+## Transport and Codec Flexibility
+
+Swap transports and codecs:
+
+```rust
+server::serve(service, WebSocketTransport, JsonCodec).await?;
+server::serve(service, WebSocketTransport, MessagePackCodec).await?;
+server::serve(service, StdioTransport, JsonCodec).await?;
+```
+
+## Auto-generated Output
+
+From one `rpc!` definition:
+
+- Rust client (typed, async)
+- Rust server (typed, async)
+- OpenAPI 3.0 spec
+- TypeScript client
+- WIT definition
+
+```rust
+let schemas = client::Client::<T, C>::schema();
+let openapi = generate_openapi_spec("API", "1.0.0", schemas.clone());
+let typescript = generate_typescript_client("Client", "http://localhost", schemas);
+let wit = client::Client::<T, C>::wit_schema("interface-name");
+```
+
+## Install
+
+```toml
+[dependencies]
+rpc-server = { git = "https://github.com/andrewgazelka/rpc" }
+rpc-codec-json = { git = "https://github.com/andrewgazelka/rpc" }
+rpc-transport-ws = { git = "https://github.com/andrewgazelka/rpc" }
+rpc-wasm-runtime = { git = "https://github.com/andrewgazelka/rpc" }  # for WASM kernels
+```
+
+Generated RPC code includes tracing spans for all client/server calls (via `rpc-core`'s re-exported `tracing`). Subscribe with `tracing-subscriber` to see structured logs with request IDs.
+
+## Examples
+
+- `examples-crate/examples/basic_websocket.rs`
+- `examples-crate/examples/codec_mixing.rs`
+- `examples-crate/examples/bidirectional.rs`
+- `examples-crate/examples/wit_gen.rs`
+- `crates/rpc-wasm-runtime/tests/wasm_kernel_test.rs`
+
+## Packages
+
+| Package | Lines |
+|---------|-------|
+| rpc-core | ~100 |
+| rpc-macro | ~330 |
+| rpc-wasm-runtime | ~125 |
+| rpc-codec-json | ~50 |
+| rpc-codec-msgpack | ~50 |
+| rpc-transport-ws | ~100 |
+| rpc-transport-stdio | ~80 |
+| rpc-openapi | ~400 |
+
+Total: ~1,235 LOC
+
+Schema system: [github.com/andrewgazelka/schema](https://github.com/andrewgazelka/schema) (~800 LOC)
+
+## Comparison
+
+|  | gRPC | tarpc | rpc |
+|---|:---:|:---:|:---:|
+| Rust source of truth | ❌ | ✅ | ✅ |
+| Swap transport | ❌ | ❌ | ✅ |
+| Swap codec | ❌ | ✅ | ✅ |
+| WASM kernels | ❌ | ❌ | ✅ |
+| WIT generation | ❌ | ❌ | ✅ |
+| OpenAPI generation | ❌ | ❌ | ✅ |
+
+## Experimental: Server-side WASM Composition
+
+This feature is experimental and under active development.
+
+### Overview
+
+Execute client logic server-side to reduce round-trips:
 
 ```rust
 // Find friends-of-friends within 2 hops
@@ -24,7 +197,7 @@ let friends_of_friends: HashSet<UserId> = client.execute_kernel(kernel_bytes).aw
 
 WASM kernel: 14KB, sandboxed via wasmtime. For a user with 50 friends, reduces 50 round-trips to 1. Client sends compiled WASM to server via RPC, server executes it and returns the result.
 
-## Writing a kernel
+### Writing a Kernel
 
 Kernels are separate Rust crates compiled to `wasm32-wasip2`:
 
@@ -86,7 +259,7 @@ const KERNEL: &[u8] = include_bytes!("../kernel/target/wasm32-wasip2/release/fri
 let friends_of_friends: HashSet<UserId> = client.execute_kernel(KERNEL).await?;
 ```
 
-### Inline kernel compilation (experimental)
+### Inline Kernel Compilation (Experimental)
 
 For a more succinct workflow, you can use `include-wasm-rs` to compile kernels at build time without a separate crate:
 
@@ -109,7 +282,7 @@ let friends_of_friends: HashSet<UserId> = client.execute_kernel(KERNEL).await?;
 
 This compiles the kernel as part of your main crate's build process, eliminating the need for a separate kernel crate.
 
-## Kernel caching
+### Kernel Caching
 
 Servers cache WASM binaries to avoid re-uploading. The client library handles this automatically:
 
@@ -137,7 +310,7 @@ Network cost:
 - After 10 executions: amortized 1.4KB per call
 - After 100 executions: amortized 140 bytes per call
 
-## CPU time limiting
+### CPU Time Limiting
 
 Clients can optionally request execution timeouts:
 
@@ -157,7 +330,7 @@ Timeout behavior:
 - Prevents malicious clients from monopolizing resources
 - Epoch interruption has approximately 10% overhead (vs 2-3x for fuel-based limiting)
 
-## Example: data aggregation
+### Example: Data Aggregation
 
 ```rust
 // 4 round-trips
@@ -178,7 +351,7 @@ impl Guest for Kernel {
 }
 ```
 
-## Example: conditional logic
+### Example: Conditional Logic
 
 ```rust
 // 2-3 round-trips depending on balance
@@ -202,7 +375,7 @@ impl Guest for Kernel {
 }
 ```
 
-## How WIT generation works
+### How WIT Generation Works
 
 ```rust
 // Define RPC interface
@@ -224,143 +397,6 @@ let wit = client::Client::<T, C>::wit_schema("counter");
 ```
 
 Write WASM kernel against the WIT interface. Compile to wasm32-wasip2. Execute server-side.
-
-## Basic usage
-
-```rust
-rpc! {
-    extern "Rust" {
-        fn add(a: i32, b: i32) -> i32;
-    }
-}
-
-// Server
-struct Service;
-impl server::AsyncService for Service {
-    async fn add(&self, a: i32, b: i32) -> i32 { a + b }
-}
-
-server::serve(Service, WebSocketTransport::bind("127.0.0.1:8080").await?, JsonCodec).await?;
-
-// Client
-let client = client::Client::new(
-    WebSocketTransport::connect("ws://127.0.0.1:8080").await?,
-    JsonCodec
-);
-let result = client.add(2, 3).await?;  // 5
-```
-
-Swap transports and codecs:
-
-```rust
-server::serve(service, WebSocketTransport, JsonCodec).await?;
-server::serve(service, WebSocketTransport, MessagePackCodec).await?;
-server::serve(service, StdioTransport, JsonCodec).await?;
-```
-
-## Stateful services
-
-Services use `&self` (not `&mut self`), enabling parallel request handling. For mutable state, use interior mutability:
-
-```rust
-use std::sync::Arc;
-use tokio::sync::Mutex;
-
-rpc! {
-    extern "Rust" {
-        fn increment() -> u64;
-        fn get_count() -> u64;
-    }
-}
-
-struct Counter {
-    count: Arc<Mutex<u64>>,
-}
-
-impl server::AsyncService for Counter {
-    async fn increment(&self) -> u64 {
-        let mut count = self.count.lock().await;
-        *count += 1;
-        *count
-    }
-
-    async fn get_count(&self) -> u64 {
-        *self.count.lock().await
-    }
-}
-
-let service = Counter {
-    count: Arc::new(Mutex::new(0)),
-};
-server::serve(service, transport, codec).await?;
-```
-
-This pattern (similar to Axum) allows you to control locking granularity and enables concurrent request processing.
-
-## Auto-generated output
-
-From one `rpc!` definition:
-
-- Rust client (typed, async)
-- Rust server (typed, async)
-- OpenAPI 3.0 spec
-- TypeScript client
-- WIT definition
-
-```rust
-let schemas = client::Client::<T, C>::schema();
-let openapi = generate_openapi_spec("API", "1.0.0", schemas.clone());
-let typescript = generate_typescript_client("Client", "http://localhost", schemas);
-let wit = client::Client::<T, C>::wit_schema("interface-name");
-```
-
-## Install
-
-```toml
-[dependencies]
-rpc-server = { git = "https://github.com/andrewgazelka/rpc" }
-rpc-codec-json = { git = "https://github.com/andrewgazelka/rpc" }
-rpc-transport-ws = { git = "https://github.com/andrewgazelka/rpc" }
-rpc-wasm-runtime = { git = "https://github.com/andrewgazelka/rpc" }  # for kernels
-```
-
-Generated RPC code includes tracing spans for all client/server calls (via `rpc-core`'s re-exported `tracing`). Subscribe with `tracing-subscriber` to see structured logs with request IDs.
-
-## Examples
-
-- `examples-crate/examples/basic_websocket.rs`
-- `examples-crate/examples/codec_mixing.rs`
-- `examples-crate/examples/bidirectional.rs`
-- `examples-crate/examples/wit_gen.rs`
-- `crates/rpc-wasm-runtime/tests/wasm_kernel_test.rs`
-
-## Packages
-
-| Package | Lines |
-|---------|-------|
-| rpc-core | ~100 |
-| rpc-macro | ~330 |
-| rpc-wasm-runtime | ~125 |
-| rpc-codec-json | ~50 |
-| rpc-codec-msgpack | ~50 |
-| rpc-transport-ws | ~100 |
-| rpc-transport-stdio | ~80 |
-| rpc-openapi | ~400 |
-
-Total: ~1,235 LOC
-
-Schema system: [github.com/andrewgazelka/schema](https://github.com/andrewgazelka/schema) (~800 LOC)
-
-## Comparison
-
-|  | gRPC | tarpc | rpc |
-|---|:---:|:---:|:---:|
-| Rust source of truth | ❌ | ✅ | ✅ |
-| Swap transport | ❌ | ❌ | ✅ |
-| Swap codec | ❌ | ✅ | ✅ |
-| WASM kernels | ❌ | ❌ | ✅ |
-| WIT generation | ❌ | ❌ | ✅ |
-| OpenAPI generation | ❌ | ❌ | ✅ |
 
 ## License
 
