@@ -65,9 +65,7 @@ impl Transport for WebSocketTransport {
     type Error = WebSocketError;
 
     async fn send(&mut self, msg: Message) -> Result<(), Self::Error> {
-        self.ws
-            .send(WsMessage::Binary(msg.data))
-            .await?;
+        self.ws.send(WsMessage::Binary(msg.data)).await?;
         Ok(())
     }
 
@@ -133,9 +131,7 @@ impl Transport for WebSocketServerTransport {
     type Error = WebSocketError;
 
     async fn send(&mut self, msg: Message) -> Result<(), Self::Error> {
-        self.ws
-            .send(WsMessage::Binary(msg.data))
-            .await?;
+        self.ws.send(WsMessage::Binary(msg.data)).await?;
         Ok(())
     }
 
@@ -216,8 +212,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_streaming_multiple_responses() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
 
         let listener = WebSocketListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.listener.local_addr().unwrap();
@@ -286,8 +282,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_streaming_with_early_termination() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
 
         let listener = WebSocketListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.listener.local_addr().unwrap();
@@ -341,8 +337,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_streaming_error_handling() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
 
         let listener = WebSocketListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.listener.local_addr().unwrap();
@@ -412,8 +408,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_concurrent_streaming_requests() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
         use std::collections::HashMap;
 
         let listener = WebSocketListener::bind("127.0.0.1:0").await.unwrap();
@@ -498,8 +494,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_large_stream_chunks() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
 
         let listener = WebSocketListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.listener.local_addr().unwrap();

@@ -28,3 +28,4 @@ schema.workspace = true
 schema-openapi.workspace = true
 schema-wit.workspace = true
 async-trait = "0.1"
+tracing.workspace = true

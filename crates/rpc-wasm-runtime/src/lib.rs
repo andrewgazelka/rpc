@@ -257,7 +257,10 @@ where
         });
 
         // Instantiate the component
-        let _instance = self.linker.instantiate_async(&mut store, &component).await?;
+        let _instance = self
+            .linker
+            .instantiate_async(&mut store, &component)
+            .await?;
 
         // TODO: Call the kernel's exported function and get result
         // For now, return empty result

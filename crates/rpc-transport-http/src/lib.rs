@@ -12,7 +12,10 @@ use axum::{
     Router,
     extract::{Path, State},
     http::StatusCode,
-    response::{IntoResponse, sse::{Event, KeepAlive, Sse}},
+    response::{
+        IntoResponse,
+        sse::{Event, KeepAlive, Sse},
+    },
     routing::{get, post},
 };
 use futures::Stream;
@@ -23,13 +26,7 @@ use hyper_util::{
     rt::TokioExecutor,
 };
 use rpc_core::{Message, Transport};
-use std::{
-    collections::HashMap,
-    convert::Infallible,
-    net::SocketAddr,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::{Mutex, RwLock, mpsc};
 use tower_http::cors::CorsLayer;
 
@@ -116,8 +113,7 @@ impl HttpTransport {
         let session_id = uuid::Uuid::new_v4().to_string();
 
         // Create HTTP client
-        let client = HyperClient::builder(TokioExecutor::new())
-            .build(HttpConnector::new());
+        let client = HyperClient::builder(TokioExecutor::new()).build(HttpConnector::new());
 
         // Create channel for SSE messages
         let (sse_tx, sse_receiver) = mpsc::unbounded_channel();
@@ -148,12 +144,8 @@ impl HttpTransport {
         })
     }
 
-    async fn connect_sse(
-        url: &str,
-        tx: mpsc::UnboundedSender<Message>,
-    ) -> Result<(), HttpError> {
-        let client = HyperClient::builder(TokioExecutor::new())
-            .build(HttpConnector::new());
+    async fn connect_sse(url: &str, tx: mpsc::UnboundedSender<Message>) -> Result<(), HttpError> {
+        let client = HyperClient::builder(TokioExecutor::new()).build(HttpConnector::new());
 
         let req = hyper::Request::builder()
             .uri(url)
@@ -265,9 +257,9 @@ impl HttpListener {
     /// # }
     /// ```
     pub async fn bind(addr: &str) -> Result<Self, HttpError> {
-        let addr: SocketAddr = addr.parse().map_err(|e| {
-            HttpError::Http(format!("invalid address: {}", e))
-        })?;
+        let addr: SocketAddr = addr
+            .parse()
+            .map_err(|e| HttpError::Http(format!("invalid address: {}", e)))?;
 
         let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 
@@ -328,18 +320,13 @@ pub struct HttpServerTransport {
 }
 
 impl HttpServerTransport {
-
     /// Get the local address the server is bound to.
     pub fn local_addr(&self) -> SocketAddr {
         self.addr
     }
 
     /// Send a message to a specific session.
-    pub async fn send_to_session(
-        &self,
-        session_id: &str,
-        msg: Message,
-    ) -> Result<(), HttpError> {
+    pub async fn send_to_session(&self, session_id: &str, msg: Message) -> Result<(), HttpError> {
         let sessions = self.state.sessions.read().await;
         if let Some(tx) = sessions.get(session_id) {
             tx.send(msg).map_err(|_| HttpError::ChannelSend)?;
@@ -433,11 +420,22 @@ mod uuid {
         pub fn to_string(&self) -> String {
             format!(
                 "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-                self.0[0], self.0[1], self.0[2], self.0[3],
-                self.0[4], self.0[5],
-                self.0[6], self.0[7],
-                self.0[8], self.0[9],
-                self.0[10], self.0[11], self.0[12], self.0[13], self.0[14], self.0[15]
+                self.0[0],
+                self.0[1],
+                self.0[2],
+                self.0[3],
+                self.0[4],
+                self.0[5],
+                self.0[6],
+                self.0[7],
+                self.0[8],
+                self.0[9],
+                self.0[10],
+                self.0[11],
+                self.0[12],
+                self.0[13],
+                self.0[14],
+                self.0[15]
             )
         }
     }
@@ -520,8 +518,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_streaming_multiple_responses() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
 
         let listener = HttpListener::bind("127.0.0.1:0").await.unwrap();
         let mut server = listener.serve().await.unwrap();
@@ -593,8 +591,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_streaming_with_early_termination() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
 
         let listener = HttpListener::bind("127.0.0.1:0").await.unwrap();
         let mut server = listener.serve().await.unwrap();
@@ -651,8 +649,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_streaming_error_handling() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
 
         let listener = HttpListener::bind("127.0.0.1:0").await.unwrap();
         let mut server = listener.serve().await.unwrap();
@@ -725,8 +723,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_concurrent_streaming_requests() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
         use std::collections::HashMap;
 
         let listener = HttpListener::bind("127.0.0.1:0").await.unwrap();
@@ -815,8 +813,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_large_stream_chunks() {
-        use rpc_core::{Codec, RpcRequest, RpcResponse, ResponseResult};
         use rpc_codec_json::JsonCodec;
+        use rpc_core::{Codec, ResponseResult, RpcRequest, RpcResponse};
 
         let listener = HttpListener::bind("127.0.0.1:0").await.unwrap();
         let mut server = listener.serve().await.unwrap();

@@ -26,6 +26,9 @@ license = "MIT"
 authors = ["Andrew Gazelka"]
 repository = "https://github.com/andrewgazelka/rpc"
 
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("openapi", "wit"))'] }
+
 [workspace.dependencies]
 # Core dependencies
 thiserror = "2.0"

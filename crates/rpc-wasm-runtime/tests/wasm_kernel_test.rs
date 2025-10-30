@@ -82,7 +82,9 @@ impl rpc::kernel::counter::Host for HostState {
 #[tokio::test]
 async fn test_wasm_kernel_execution() {
     // Load the WASM component
-    let wasm_bytes = include_bytes!("../../../tests/wasm-kernel/guest/target/wasm32-wasip2/release/counter_kernel_guest.wasm");
+    let wasm_bytes = include_bytes!(
+        "../../../tests/wasm-kernel/guest/target/wasm32-wasip2/release/counter_kernel_guest.wasm"
+    );
 
     // Create RPC client and server with in-process transport
     let (client_transport, server_transport) = InProcessTransport::pair();
@@ -137,7 +139,10 @@ async fn test_wasm_kernel_execution() {
 
     // The kernel should call increment() 10 times starting from 0
     // Expected result: 10
-    assert_eq!(result, 10, "Kernel should return 10 after incrementing 10 times");
+    assert_eq!(
+        result, 10,
+        "Kernel should return 10 after incrementing 10 times"
+    );
 
     // Verify the server's internal state was updated
     let final_value = *counter_value.lock().await;

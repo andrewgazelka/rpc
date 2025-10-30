@@ -43,13 +43,20 @@ pub trait Transport: Send {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Send a message through the transport
-    fn send(&mut self, msg: Message) -> impl std::future::Future<Output = std::result::Result<(), Self::Error>> + Send;
+    fn send(
+        &mut self,
+        msg: Message,
+    ) -> impl std::future::Future<Output = std::result::Result<(), Self::Error>> + Send;
 
     /// Receive a message from the transport
-    fn recv(&mut self) -> impl std::future::Future<Output = std::result::Result<Message, Self::Error>> + Send;
+    fn recv(
+        &mut self,
+    ) -> impl std::future::Future<Output = std::result::Result<Message, Self::Error>> + Send;
 
     /// Close the transport gracefully
-    fn close(&mut self) -> impl std::future::Future<Output = std::result::Result<(), Self::Error>> + Send {
+    fn close(
+        &mut self,
+    ) -> impl std::future::Future<Output = std::result::Result<(), Self::Error>> + Send {
         async { Ok(()) }
     }
 }

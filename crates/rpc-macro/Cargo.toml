@@ -19,7 +19,6 @@ schema-openapi = { workspace = true, optional = true }
 
 [features]
 default = []
-tracing = []
 wit = ["schema-wit"]
 openapi = ["schema-openapi"]
 
@@ -34,3 +33,4 @@ schema.workspace = true
 schema-openapi.workspace = true
 tokio = { workspace = true, features = ["full"] }
 futures.workspace = true
+tracing.workspace = true

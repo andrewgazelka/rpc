@@ -2,7 +2,7 @@
 //! This demonstrates the low-level protocol without macro-generated streaming
 
 use rpc_codec_json::JsonCodec;
-use rpc_core::{Codec, Message, RpcRequest, RpcResponse, ResponseResult, Transport};
+use rpc_core::{Codec, Message, ResponseResult, RpcRequest, RpcResponse, Transport};
 use rpc_transport_inprocess::InProcessTransport;
 
 #[tokio::test]

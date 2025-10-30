@@ -78,10 +78,13 @@ async fn test_local_types() {
 
     // Test get_user
     let user = client.get_user(1).await.unwrap();
-    assert_eq!(user, Some(User {
-        id: 1,
-        name: "Alice".to_string(),
-    }));
+    assert_eq!(
+        user,
+        Some(User {
+            id: 1,
+            name: "Alice".to_string(),
+        })
+    );
 
     let no_user = client.get_user(999).await.unwrap();
     assert_eq!(no_user, None);

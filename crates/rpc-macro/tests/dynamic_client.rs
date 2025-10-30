@@ -1,8 +1,8 @@
 //! Test DynamicClient with call method
 
 use rpc_server::rpc;
-use serde::{Deserialize, Serialize};
 use schema::Schema;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Schema)]
 pub struct DataChunk {

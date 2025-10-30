@@ -24,6 +24,7 @@ serde_json.workspace = true
 schema.workspace = true
 schema-openapi = { workspace = true, optional = true }
 schema-wit = { workspace = true, optional = true }
+tracing.workspace = true
 
 [features]
 default = []

@@ -84,7 +84,6 @@ pub fn rpc(input: TokenStream) -> TokenStream {
             // Generate client method
             client_methods.push(quote! {
                 pub async fn #method_name(&self, #(#param_names: #param_types),*) -> rpc_core::Result<#return_type> {
-                    #[cfg(feature = "tracing")]
                     let span = tracing::debug_span!(
                         "rpc_client_call",
                         method = #method_str,
@@ -94,7 +93,6 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     let params = self.codec.encode(&(#(#param_names,)*))?;
                     let request_id = self.next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-                    #[cfg(feature = "tracing")]
                     span.record("request_id", request_id);
 
                     let request = rpc_core::RpcRequest {
@@ -103,7 +101,6 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                         params,
                     };
 
-                    #[cfg(feature = "tracing")]
                     tracing::debug!(parent: &span, "sending request");
 
                     let msg_data = self.codec.encode(&request)?;
@@ -111,7 +108,6 @@ pub fn rpc(input: TokenStream) -> TokenStream {
 
                     self.transport.lock().await.send(msg).await.map_err(rpc_core::Error::transport)?;
 
-                    #[cfg(feature = "tracing")]
                     tracing::debug!(parent: &span, "awaiting response");
 
                     let response_msg = self.transport.lock().await.recv().await.map_err(rpc_core::Error::transport)?;
@@ -120,22 +116,18 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     match response.result {
                         rpc_core::ResponseResult::Ok(data) => {
                             let result = self.codec.decode(&data)?;
-                            #[cfg(feature = "tracing")]
                             tracing::debug!(parent: &span, ?result, "call succeeded");
                             Ok(result)
                         }
                         rpc_core::ResponseResult::Err(e) => {
-                            #[cfg(feature = "tracing")]
                             tracing::warn!(parent: &span, error = %e, "call failed");
                             Err(rpc_core::Error::remote(e))
                         }
                         rpc_core::ResponseResult::StreamChunk(_) => {
-                            #[cfg(feature = "tracing")]
                             tracing::error!(parent: &span, "unexpected stream chunk in non-streaming call");
                             Err(rpc_core::Error::other("unexpected stream chunk in non-streaming call"))
                         }
                         rpc_core::ResponseResult::StreamEnd => {
-                            #[cfg(feature = "tracing")]
                             tracing::error!(parent: &span, "unexpected stream end in non-streaming call");
                             Err(rpc_core::Error::other("unexpected stream end in non-streaming call"))
                         }
@@ -154,9 +146,12 @@ pub fn rpc(input: TokenStream) -> TokenStream {
             // Generate intake match arm for blanket impl
             // Unpack tuple into individual parameters
             let indices: Vec<_> = (0..params.len()).map(syn::Index::from).collect();
-            let field_accesses: Vec<_> = indices.iter().map(|idx| {
-                quote! { params.#idx }
-            }).collect();
+            let field_accesses: Vec<_> = indices
+                .iter()
+                .map(|idx| {
+                    quote! { params.#idx }
+                })
+                .collect();
 
             intake_match_arms.push(quote! {
                 Msg::#method_name(params, tx) => {
@@ -204,10 +199,13 @@ pub fn rpc(input: TokenStream) -> TokenStream {
 
             // Generate WIT method signature (only when wit feature is enabled)
             // Convert param names to strings for WIT generation
-            let _param_name_strs: Vec<_> = param_names.iter().map(|p| {
-                // Extract identifier from pattern
-                quote! { stringify!(#p) }.to_string()
-            }).collect();
+            let _param_name_strs: Vec<_> = param_names
+                .iter()
+                .map(|p| {
+                    // Extract identifier from pattern
+                    quote! { stringify!(#p) }.to_string()
+                })
+                .collect();
 
             wit_methods.push(quote! {
                 #[cfg(feature = "wit")]
@@ -475,20 +473,17 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     let msg = transport.recv().await.map_err(rpc_core::Error::transport)?;
                     let request: RpcRequest = codec.decode(&msg.data)?;
 
-                    #[cfg(feature = "tracing")]
                     let span = tracing::debug_span!(
                         "rpc_server_dispatch",
                         method = %request.method,
                         request_id = request.id
                     );
 
-                    #[cfg(feature = "tracing")]
                     tracing::debug!(parent: &span, "received request");
 
                     let result = match request.method.as_str() {
                         #(#final_dispatch_arms)*
                         method => {
-                            #[cfg(feature = "tracing")]
                             tracing::warn!(parent: &span, method = %method, "method not found");
                             rpc_core::ResponseResult::Err(
                                 format!("method not found: {}", method)
@@ -496,7 +491,6 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                         }
                     };
 
-                    #[cfg(feature = "tracing")]
                     match &result {
                         rpc_core::ResponseResult::Ok(_) => tracing::debug!(parent: &span, "method call succeeded"),
                         rpc_core::ResponseResult::Err(e) => tracing::warn!(parent: &span, error = %e, "method call failed"),
@@ -513,7 +507,6 @@ pub fn rpc(input: TokenStream) -> TokenStream {
                     let response_msg = Message::new(response_data);
                     transport.send(response_msg).await.map_err(rpc_core::Error::transport)?;
 
-                    #[cfg(feature = "tracing")]
                     tracing::debug!(parent: &span, "sent response");
                 }
             }

@@ -218,7 +218,10 @@ rpc-server = { git = "https://github.com/andrewgazelka/rpc" }
 rpc-codec-json = { git = "https://github.com/andrewgazelka/rpc" }
 rpc-transport-ws = { git = "https://github.com/andrewgazelka/rpc" }
 rpc-wasm-runtime = { git = "https://github.com/andrewgazelka/rpc" }  # for kernels
+tracing = "0.1"  # Required for generated RPC code
 ```
+
+Generated RPC code includes tracing spans for all client/server calls. Subscribe to tracing events with `tracing-subscriber` to see structured logs with request IDs.
 
 ## Examples
 
